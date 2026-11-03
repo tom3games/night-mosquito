@@ -44,7 +44,8 @@ const fit = q => q.evaluate(() => {
 })
 // 2つの要素が重なっていないか
 const overlap = (q, a, b) => q.evaluate(([a, b]) => { const A = document.querySelector(a), B = document.querySelector(b); if (!A || !B || A.closest('.hidden') || B.closest('.hidden')) return false; const r = A.getBoundingClientRect(), s = B.getBoundingClientRect(); if (!r.width || !s.width) return false; return !(r.right <= s.left || s.right <= r.left || r.bottom <= s.top || s.bottom <= r.top) }, [a, b])
-const SIZES = [[360, 640, 'small'], [390, 844, 'phone'], [844, 390, 'land'], [667, 375, 'land-se'], [768, 1024, 'tab'], [1440, 900, 'pc']]
+// 2026-11-03 本人方針: スマホ縦だけ確かめる（横持ち・PC は指定された時だけ）
+const SIZES = [[360, 640, 'small'], [390, 844, 'phone'], [430, 932, 'max']]
 const night = (p, kind, seed, opts) => p.evaluate(({ kind, seed, opts }) => {
   nm.start(seed, opts); nm.dbg.pause(true); nm.dbg.input(__bot(kind))
   let n = 0; while (nm.mode === 'play' && n < 60 * 200) { nm.dbg.step(60); n += 60 }
@@ -142,32 +143,31 @@ await t('英語に切り替えると文言と報告書が英語', async () => {
   await p.click('#btnLang')
   expect(r.h1 === 'Summer Night Mosquito' && /Fly/.test(r.start), r); return r
 })
-await t('PC: WASD で飛ぶ・Space で上がる・E で刺す', async () => {
-  const r = await p.evaluate(async () => { nm.start(21, { gramps: false, cat: false }); nm.dbg.pause(true); const y0 = nm.M.pos.y, z0 = nm.M.pos.z; dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })); dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' })); nm.dbg.step(40); dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })); dispatchEvent(new KeyboardEvent('keyup', { code: 'Space' })); return { dy: +(nm.M.pos.y - y0).toFixed(2), dz: +(nm.M.pos.z - z0).toFixed(2) } })
-  expect(r.dy > 0.1 && r.dz < -0.1, r); return r
-})
 await t('Chromium: エラーなし', async () => { expect(p.errs.length === 0, p.errs.join('|')) })
 await p.close()
 
-// ---- 6サイズ × 全画面
-for (const [w, h, name] of SIZES) {
-  const touch = w < 1000
-  const q = await open(browser, { viewport: { width: w, height: h }, hasTouch: touch, isMobile: touch })
+// ---- スマホ縦3サイズ × 全画面（Chromium と WebKit）
+const wk0 = await webkit.launch()
+for (const [eng, bw] of [['chromium', browser], ['webkit', wk0]]) for (const [w, h, name0] of SIZES) {
+  const name = eng + '-' + name0, touch = true
+  const q = await open(bw, { viewport: { width: w, height: h }, hasTouch: touch, isMobile: touch })
   const views = {}
   views.title = await fit(q); await q.screenshot({ path: `${ROOT}/shots/fit-${name}-title.png` })
-  await q.click('#btnHow'); views.how = await fit(q); await q.screenshot({ path: `${ROOT}/shots/fit-${name}-how.png` }); await q.click('#btnOk')
-  await q.click('#btnStart'); await q.waitForTimeout(300)
+  const tap = sel => eng === 'webkit' ? q.tap(sel) : q.click(sel)
+  await tap('#btnHow'); views.how = await fit(q); await q.screenshot({ path: `${ROOT}/shots/fit-${name}-how.png` }); await tap('#btnOk')
+  await tap('#btnStart'); await q.waitForTimeout(300)
   await q.evaluate(() => { nm.dbg.pause(true); const mom = nm.people().find(p => p.id === 'mom'); mom.updateWorld(); const s = mom.spots.find(s => s.key === 'armR'); nm.M.pos.copy(s.w).add({ x: 0.03, y: 0.07, z: 0.05 }); nm.dbg.setCam(0.6, -0.5); nm.dbg.step(1); for (let i = 0; i < 20; i++) nm.dbg.render() })
   views.play = await fit(q); await q.screenshot({ path: `${ROOT}/shots/fit-${name}-play.png` })
   const ov = touch ? await overlap(q, '.clock', '#tip') : false
   await t(`${name}: 時計とヒントが重ならない`, async () => { expect(!ov, ov) })
-  await q.evaluate(() => nm.dbg.pause(false)); await q.click('#btnPause'); views.pause = await fit(q); await q.click('#btnResume')
+  await q.evaluate(() => nm.dbg.pause(false)); await tap('#btnPause'); views.pause = await fit(q); await tap('#btnResume')
   await night(q, 'skilled', 2000); await q.waitForTimeout(400)
   views.result = await fit(q); await q.screenshot({ path: `${ROOT}/shots/fit-${name}-result.png` })
   for (const [v, r] of Object.entries(views)) await t(`一画面に収まる ${name} ${w}x${h} ${v}`, async () => { expect(!r.over.length, r) })
   await t(`${name}: はみ出し・エラーなし`, async () => { const o = await overflow(q); expect(o.sw <= o.W && !o.bad.length && !q.errs.length, JSON.stringify(o) + q.errs.join('|')) })
   await q.close()
 }
+await wk0.close()
 await browser.close()
 
 // ---- WebKit（iPhone 相当）でタッチの通し
