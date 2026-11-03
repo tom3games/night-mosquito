@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Klee+One:wght@400;600&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=2">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 </head>
 <body>
@@ -32,16 +32,17 @@
     <b id="clockT">23:00</b>
   </div>
   <p id="tip" class="tip hidden"></p>
-  <button id="btnPause" class="corner" aria-label="pause"><svg viewBox="0 0 20 20"><rect x="5" y="4" width="3.4" height="12" rx="1"/><rect x="11.6" y="4" width="3.4" height="12" rx="1"/></svg></button>
+  <button id="btnPause" class="corner" aria-label="pause"><svg viewBox="0 0 20 20"><rect x="4.5" y="3.5" width="4" height="13" rx="1"/><rect x="11.5" y="3.5" width="4" height="13" rx="1"/></svg></button>
   <div id="touch" class="touch hidden">
     <div id="stickZone" class="stickzone"><div id="stick" class="stick"><div class="knob"></div></div></div>
-    <button id="btnUp" class="wing up" aria-label="up"><svg viewBox="0 0 40 40"><path d="M8 26l12-12 12 12" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/></svg></button>
-    <button id="btnDown" class="wing down" aria-label="down"><svg viewBox="0 0 40 40"><path d="M8 14l12 12 12-12" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/></svg></button>
+    <button id="btnUp" class="wing up" aria-label="up"><svg viewBox="0 0 48 40"><path d="M24 30C14 26 5 20 4 13c-1-5 6-6 11-3 4 2 7 7 9 12" fill="rgba(220,232,255,.35)" stroke="currentColor" stroke-width="2"/><path d="M24 30c10-4 19-10 20-17 1-5-6-6-11-3-4 2-7 7-9 12" fill="rgba(220,232,255,.35)" stroke="currentColor" stroke-width="2"/><path d="M8 13l7 5M40 13l-7 5" stroke="currentColor" stroke-width="1"/><path d="M18 9l6-6 6 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg></button>
+    <button id="btnDown" class="wing down" aria-label="down"><svg viewBox="0 0 48 40"><path d="M24 12C14 16 5 22 4 29c-1 5 6 6 11 3 4-2 7-7 9-12" fill="rgba(220,232,255,.35)" stroke="currentColor" stroke-width="2"/><path d="M24 12c10 4 19 10 20 17 1 5-6 6-11 3-4-2-7-7-9-12" fill="rgba(220,232,255,.35)" stroke="currentColor" stroke-width="2"/><path d="M18 31l6 6 6-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg></button>
   </div>
   <button id="btnBite" class="bite" data-s="off" aria-label="bite">
     <svg class="i-bite" viewBox="0 0 64 64"><ellipse cx="24" cy="30" rx="9" ry="7" fill="currentColor"/><circle cx="34" cy="30" r="5" fill="currentColor"/><path d="M37 32l20 14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M16 31c-8 1-12 4-14 6" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><path d="M22 36l-4 12M27 36l1 13M31 35l6 11" stroke="currentColor" stroke-width="1.6"/></svg>
     <svg class="i-rest" viewBox="0 0 64 64"><path d="M6 52h52" stroke="currentColor" stroke-width="3"/><ellipse cx="32" cy="30" rx="10" ry="6" fill="currentColor"/><path d="M24 33l-8 18M30 35l-2 17M36 35l3 17M41 33l9 18" stroke="currentColor" stroke-width="2"/></svg>
     <svg class="i-leave" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="8" ry="6" fill="currentColor"/><path d="M30 36C18 20 8 18 6 22c-2 5 12 12 22 14M34 36c12-16 22-18 24-14 2 5-12 12-22 14" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M32 10v12M26 16l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.6"/></svg>
+    <span id="biteLbl" class="lbl"></span>
   </button>
 </section>
 <div id="say" class="say hidden"></div>
@@ -68,7 +69,7 @@
   <div class="notice">
     <h2 data-t="howTitle"></h2>
     <ol id="howList"></ol>
-    <p class="keys" id="howKeys"></p>
+    <dl class="keys" id="howKeys"></dl>
     <button id="btnOk" class="go small" data-t="ok"></button>
     <p class="credit" data-t="credit"></p>
   </div>
@@ -145,8 +146,8 @@
   },9000);
 })();
 </script>
-<script src="data.js?v=1"></script>
-<script src="sfx.js?v=1"></script>
-<script type="module" src="js/game.js?v=1"></script>
+<script src="data.js?v=2"></script>
+<script src="sfx.js?v=2"></script>
+<script type="module" src="js/game.js?v=2"></script>
 </body>
 </html>

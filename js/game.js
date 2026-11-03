@@ -1,8 +1,8 @@
 // 夏の夜の蚊。自分が蚊になって、寝ている家族の血を吸う。3D・蚊の斜め後ろからのカメラ
 // 物理と判定は固定60Hz（performance.now で数える）。描画は毎フレーム
 import * as THREE from 'three'
-import { buildRoom, futon, towel, ROOM } from './room.js?v=1'
-import { loadFamily, Sleeper, Cat, makeMosquito } from './family.js?v=1'
+import { buildRoom, futon, towel, ROOM } from './room.js?v=2'
+import { loadFamily, Sleeper, Cat, makeMosquito } from './family.js?v=2'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -69,7 +69,7 @@ const M = {   // 蚊
 }
 let W = null   // 1晩の状態
 let mode = 'loading', paused = false, simAcc = 0, lastT = 0, frozen = false
-let camYaw = 0, camPitch = -0.15, shake = 0, flash = 0, hitStop = 0, deathT = 0, glowTarget = null, nearSurface = null
+let camDist = 0.1, camYaw = 0, camPitch = -0.15, shake = 0, flash = 0, hitStop = 0, deathT = 0, glowTarget = null, nearSurface = null
 const say = { el: $('say'), who: null, t: 0 }
 let testInput = null, camOverride = null
 const people = []
@@ -232,8 +232,9 @@ function applyLang() {
   document.documentElement.lang = lang
   for (const el of document.querySelectorAll('[data-t]')) { const v = T()[el.dataset.t]; if (typeof v === 'string') el.textContent = v }
   $('howList').innerHTML = T().how.map(s => `<li>${s}</li>`).join('')
-  $('howKeys').textContent = coarse ? T().keysTouch : T().keysPC
+  $('howKeys').innerHTML = (coarse ? T().keysTouch : T().keysPC).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')
   $('btnMute').textContent = muted ? T().soundOff : T().soundOn
+  $('biteLbl').textContent = T().lbl[$('btnBite').dataset.s] || ''
 }
 $('btnLang').onclick = () => { lang = lang === 'ja' ? 'en' : 'ja'; try { localStorage.setItem('nm_lang', lang) } catch (e) {} applyLang() }
 $('btnMute').onclick = () => { muted = !muted; Snd.setMute(muted); try { localStorage.setItem('nm_mute', muted ? '1' : '0') } catch (e) {} applyLang() }
@@ -569,6 +570,7 @@ function stepCat(dt) {
 // ---- チュートリアル（最初の1回。文字は1つずつ）
 function stepTut(dt) {
   if (W.tut >= 99) { if (M.full > 0.8 && !W.seenFull) { W.seenFull = true; W.restHint = 4 } if (W.restHint > 0) { W.restHint -= dt; tip('rest') } else tip(null); return }
+  if (W.tut < 3 && M.state === 'suck') { W.tut = 3; W.tutT = 0 }
   if (W.tut === 0) { tip(coarse ? 'moveTouch' : 'movePC'); if (W.movedDist > 0.6) W.tut = 1 }
   else if (W.tut === 1) { tip('find'); if (glowTarget) W.tut = 2 }
   else if (W.tut === 2) { tip(coarse ? 'biteTouch' : 'bitePC'); if (M.state === 'suck') { W.tut = 3; W.tutT = 0 } if (!glowTarget && M.state === 'fly') W.tut = 1 }
@@ -595,16 +597,44 @@ function endNight() {
   Snd.duck(0.35, 2.5)
 }
 // 体の図の点の位置（正面の人型。0..1）
-const BODY = { forehead: [0.5, 0.08], cheek: [0.42, 0.15], top: [0.5, 0.015], armL: [0.86, 0.5], armR: [0.14, 0.5], footL: [0.62, 0.96], footR: [0.38, 0.96] }
-function drawFigure(g, x, y, w, h, child) {
-  g.save(); g.translate(x, y); g.strokeStyle = '#3a3a44'; g.lineWidth = 3; g.fillStyle = 'rgba(255,255,255,.35)'
-  const hw = w, hh = h, hr = hw * 0.16
-  g.beginPath(); g.arc(hw / 2, hr + 2, hr, 0, 7); g.fill(); g.stroke()
-  g.beginPath(); g.moveTo(hw * 0.3, hr * 2 + 8); g.lineTo(hw * 0.7, hr * 2 + 8); g.lineTo(hw * 0.74, hh * 0.58); g.lineTo(hw * 0.26, hh * 0.58); g.closePath(); g.fill(); g.stroke()
-  g.beginPath(); g.moveTo(hw * 0.3, hr * 2 + 10); g.lineTo(hw * 0.1, hh * 0.52); g.moveTo(hw * 0.7, hr * 2 + 10); g.lineTo(hw * 0.9, hh * 0.52); g.stroke()
-  g.beginPath(); g.moveTo(hw * 0.4, hh * 0.58); g.lineTo(hw * 0.36, hh * 0.97); g.moveTo(hw * 0.6, hh * 0.58); g.lineTo(hw * 0.64, hh * 0.97); g.stroke()
+const BODY = { forehead: [0.5, 0.1], cheek: [0.36, 0.21], top: [0.5, 0.03], armL: [0.86, 0.58], armR: [0.14, 0.58], footL: [0.63, 0.9], footR: [0.37, 0.9] }
+const FIGC = { dad: '#26304a', mom: '#7a7f8c', kid: '#3f8a5a', gramps: '#c7642e' }
+function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath() }
+// 正面の人の絵（服の色・肌・閉じた目）。itch が多いほど顔がしかめっつら
+function drawFigure(g, x, y, w, h, id, itch) {
+  g.save(); g.translate(x, y); g.lineJoin = 'round'
+  const skinC = '#f0c09a', ink = '#3a2e28', cloth = FIGC[id] || '#555'
+  g.lineWidth = 3; g.strokeStyle = ink
+  // 脚（すね・足は素足）
+  for (const s of [-1, 1]) { g.fillStyle = cloth; rr(g, w / 2 + s * w * 0.13 - w * 0.09, h * 0.6, w * 0.18, h * 0.2, 6); g.fill(); g.stroke(); g.fillStyle = skinC; rr(g, w / 2 + s * w * 0.13 - w * 0.085, h * 0.79, w * 0.17, h * 0.19, 6); g.fill(); g.stroke() }
+  // 腕
+  for (const s of [-1, 1]) { g.save(); g.translate(w / 2 + s * w * 0.27, h * 0.36); g.rotate(s * -0.35); g.fillStyle = cloth; rr(g, -w * 0.07, 0, w * 0.14, h * 0.13, 6); g.fill(); g.stroke(); g.fillStyle = skinC; rr(g, -w * 0.065, h * 0.12, w * 0.13, h * 0.12, 6); g.fill(); g.stroke(); g.restore() }
+  // 胴
+  g.fillStyle = cloth; rr(g, w * 0.24, h * 0.33, w * 0.52, h * 0.31, 10); g.fill(); g.stroke()
+  if (id === 'dad') { g.fillStyle = '#c4161c'; g.beginPath(); g.moveTo(w / 2 - 6, h * 0.34); g.lineTo(w / 2 + 6, h * 0.34); g.lineTo(w / 2 + 4, h * 0.52); g.lineTo(w / 2, h * 0.56); g.lineTo(w / 2 - 4, h * 0.52); g.closePath(); g.fill() }
+  // 頭
+  const hr = w * 0.24, hx = w / 2, hy = h * 0.17
+  g.fillStyle = skinC; rr(g, hx - hr, hy - hr * 0.95, hr * 2, hr * 1.9, hr * 0.5); g.fill(); g.stroke()
+  if (id !== 'gramps') { g.fillStyle = { dad: '#2a2018', mom: '#c96a3a', kid: '#1e1a18' }[id] || '#333'; g.beginPath(); g.moveTo(hx - hr, hy - hr * 0.2); g.quadraticCurveTo(hx - hr, hy - hr * 1.1, hx, hy - hr * 1.05); g.quadraticCurveTo(hx + hr, hy - hr * 1.1, hx + hr, hy - hr * 0.2); g.lineTo(hx + hr * 0.6, hy - hr * 0.55); g.lineTo(hx - hr * 0.6, hy - hr * 0.55); g.closePath(); g.fill(); g.stroke() }
+  else { g.fillStyle = '#e9e4da'; g.beginPath(); g.ellipse(hx, hy + hr * 0.7, hr * 0.7, hr * 0.35, 0, 0, Math.PI); g.fill() }
+  // 目と口（刺されるほどしかめる）
+  g.lineWidth = 2.6
+  for (const s of [-1, 1]) { g.beginPath(); if (itch >= 2) { g.moveTo(hx + s * hr * 0.55, hy - hr * 0.05); g.lineTo(hx + s * hr * 0.2, hy + hr * 0.08) } else { g.arc(hx + s * hr * 0.38, hy, hr * 0.15, 0.15, Math.PI - 0.15) } g.stroke() }
+  g.beginPath(); if (itch >= 1) { g.moveTo(hx - hr * 0.2, hy + hr * 0.5); g.quadraticCurveTo(hx, hy + hr * 0.36, hx + hr * 0.2, hy + hr * 0.5) } else { g.arc(hx, hy + hr * 0.35, hr * 0.18, 0.3, Math.PI - 0.3) } g.stroke()
   g.restore()
 }
+function drawCat(g, x, y, w) {
+  g.save(); g.translate(x, y); g.fillStyle = '#2e2926'; g.strokeStyle = '#3a2e28'; g.lineWidth = 3
+  g.beginPath(); g.ellipse(w / 2, w * 0.95, w * 0.42, w * 0.3, 0, 0, 7); g.fill()
+  g.beginPath(); g.arc(w / 2, w * 0.55, w * 0.25, 0, 7); g.fill()
+  for (const s of [-1, 1]) { g.beginPath(); g.moveTo(w / 2 + s * w * 0.22, w * 0.45); g.lineTo(w / 2 + s * w * 0.2, w * 0.25); g.lineTo(w / 2 + s * w * 0.06, w * 0.36); g.fill() }
+  g.fillStyle = '#e6cf3a'; for (const s of [-1, 1]) { g.beginPath(); g.ellipse(w / 2 + s * w * 0.1, w * 0.55, w * 0.05, w * 0.04, 0, 0, 7); g.fill() }
+  g.fillStyle = '#111'; for (const s of [-1, 1]) g.fillRect(w / 2 + s * w * 0.1 - 1.5, w * 0.515, 3, w * 0.075)
+  g.strokeStyle = '#2e2926'; g.lineWidth = 7; g.beginPath(); g.moveTo(w * 0.85, w * 1.05); g.quadraticCurveTo(w * 1.05, w * 0.8, w * 0.92, w * 0.62); g.stroke()
+  g.restore()
+}
+// 刺されたあと（ぷっくり）
+function bump(g, x, y, k) { g.fillStyle = 'rgba(240,120,130,.45)'; g.beginPath(); g.arc(x, y, 17 * k, 0, 7); g.fill(); g.fillStyle = '#e04a55'; g.beginPath(); g.arc(x, y, 8 * k, 0, 7); g.fill(); g.fillStyle = '#b3121a'; g.beginPath(); g.arc(x, y, 3 * k, 0, 7); g.fill() }
 function drawReport(r) {
   const c = $('report'), g = c.getContext('2d'), Wd = 1080, Ht = 1350
   c.width = Wd; c.height = Ht
@@ -621,16 +651,17 @@ function drawReport(r) {
   const n = fam.length + (W.cat ? 1 : 0), colW = (Wd - 120) / Math.min(n, 4)
   fam.forEach((p, i) => {
     const x = 60 + i * colW, y = 250, fw = Math.min(200, colW - 30), fh = fw * 1.55
-    drawFigure(g, x + (colW - fw) / 2, y, fw, fh * (p.id === 'kid' ? 0.85 : 1))
     const counts = {}; for (const b of W.bites) if (b.who === p.id) counts[b.key] = (counts[b.key] || 0) + 1
-    for (const k in counts) { const pt = BODY[k]; if (!pt) continue; for (let j = 0; j < counts[k]; j++) { g.fillStyle = '#c4161c'; g.beginPath(); g.arc(x + (colW - fw) / 2 + pt[0] * fw + j * 9, y + pt[1] * fh * (p.id === 'kid' ? 0.85 : 1) + j * 6, 11, 0, 7); g.fill(); g.fillStyle = 'rgba(196,22,28,.25)'; g.beginPath(); g.arc(x + (colW - fw) / 2 + pt[0] * fw + j * 9, y + pt[1] * fh * (p.id === 'kid' ? 0.85 : 1) + j * 6, 20, 0, 7); g.fill() } }
+    const kh = p.id === 'kid' ? 0.82 : 1, fx = x + (colW - fw) / 2, fy = y + fh * (1 - kh)
+    drawFigure(g, fx, fy, fw, fh * kh, p.id, p.bites.length)
+    for (const k in counts) { const pt = BODY[k]; if (!pt) continue; for (let j = 0; j < counts[k]; j++) bump(g, fx + pt[0] * fw + j * 10, fy + pt[1] * fh * kh + j * 7, 1) }
     const nb = p.bites.length
     g.fillStyle = '#222'; g.font = F(40); g.fillText(p.def.name[lang], x + 10, y + fh + 60)
     g.font = F(34, 600); g.fillStyle = nb ? '#b3121a' : '#555'; g.fillText(nb + (lang === 'ja' ? 'か所' : ' bites'), x + 10, y + fh + 104)
     const m = MORN[p.id][lang], line = nb === 0 ? m[0] : nb === 1 ? m[1] : nb === 2 ? m[2] : m[3]
     wrapText(g, '「' + line + '」', x + 10, y + fh + 150, colW - 24, 40, F(30, 600), '#333')
   })
-  if (W.cat) { const x = 60 + fam.length * colW; if (fam.length < 4) { g.font = F(40); g.fillStyle = '#222'; g.fillText(lang === 'ja' ? 'ねこ' : 'Cat', x + 10, 250 + 300); wrapText(g, '「' + MORN.cat[lang][0] + '」', x + 10, 250 + 350, colW - 24, 40, F(30, 600), '#333') } }
+  if (W.cat) { const cw = fam.length < 4 ? Math.min(150, colW - 40) : 118, cx = fam.length < 4 ? 60 + fam.length * colW : Wd - 60 - cw, cy = fam.length < 4 ? 250 + 120 : 40; drawCat(g, cx + (fam.length < 4 ? (colW - cw) / 2 : 0), cy, cw); if (fam.length < 4) { g.font = F(40); g.fillStyle = '#222'; g.fillText(lang === 'ja' ? 'ねこ' : 'Cat', cx + 10, 250 + fw0(colW) * 1.55 + 60); wrapText(g, '「' + MORN.cat[lang][0] + '」', cx + 10, 250 + fw0(colW) * 1.55 + 150, colW - 24, 40, F(30, 600), '#333') } }
   // 下: 吸った血・刺した数・判定ハンコ
   const by = 940
   g.fillStyle = '#222'; g.font = F(40, 600); g.fillText(L.blood, 80, by); g.fillText(L.bites, 80, by + 76)
@@ -649,8 +680,9 @@ function drawReport(r) {
   if (lang === 'ja' && rn.length > 5) { const h = Math.ceil(rn.length / 2); g.font = F(size); g.fillText(rn.slice(0, h), 0, -6); g.fillText(rn.slice(h), 0, size + 2) }
   else { g.font = F(size); wrapCenter(g, rn, 0, 0, 200, size + 4) }
   g.restore()
-  g.font = F(24, 600); g.fillStyle = '#777'; g.textAlign = 'left'; g.fillText('tom3games.github.io/night-mosquito', 80, Ht - 50)
+  g.font = '500 24px "Zen Kaku Gothic New",sans-serif'; g.fillStyle = '#777'; g.textAlign = 'left'; g.fillText('tom3games.github.io/night-mosquito', 80, Ht - 50)
 }
+const fw0 = colW => Math.min(200, colW - 30)
 function wrapText(g, s, x, y, w, lh, font, col) {
   g.font = font; g.fillStyle = col; let line = '', yy = y
   const parts = lang === 'ja' ? [...s] : s.split(/(\s+)/)
@@ -715,7 +747,7 @@ function render(dt) {
     const a = tnow * 0.05
     camera.position.set(1.45 + Math.sin(a) * 0.15, 1.55, 1.35); camera.lookAt(-0.35, 0.15 + Math.sin(a * 2) * 0.05, -0.9)
   } else if (M.alive || !W || !W.deathAt) {
-    const dist = 0.1 + M.full * 0.025
+    camDist = lerp(camDist, M.state === 'fly' ? 0.1 + M.full * 0.025 : 0.17, Math.min(1, dt * 4)); const dist = camDist
     const side = new THREE.Vector3(Math.cos(camYaw), 0, -Math.sin(camYaw))
     camTarget = M.pos.clone().addScaledVector(fwd, -dist).addScaledVector(side, 0.028).add(new THREE.Vector3(0, 0.045, 0))
     pushOut(camTarget, 0.006)
@@ -762,7 +794,7 @@ function render(dt) {
     $('clockT').textContent = `${hh}:${String(mm).padStart(2, '0')}`
     const bb = $('btnBite')
     const st = !M.alive ? 'off' : M.state === 'suck' || M.state === 'land' || M.state === 'rest' ? 'leave' : glowTarget ? 'bite' : nearSurface ? 'rest' : 'off'
-    if (bb.dataset.s !== st) { bb.dataset.s = st }
+    if (bb.dataset.s !== st) { bb.dataset.s = st; $('biteLbl').textContent = T().lbl[st] }
   }
   if (say.t > 0) {
     say.t -= dt

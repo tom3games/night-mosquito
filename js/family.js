@@ -207,9 +207,9 @@ export function makeMosquito() {
   const legs = []
   for (let i = 0; i < 3; i++) for (const s of [-1, 1]) {
     const L = new THREE.Group(); L.position.set(s * 0.002, -0.0025, -0.003 + i * 0.003); g.add(L)
-    const up = new THREE.Mesh(new THREE.CylinderGeometry(0.00022, 0.00022, 0.01, 4), black); up.position.set(s * 0.004, 0.0015, 0); up.rotation.z = s * 1.2; L.add(up)
-    const dn = new THREE.Mesh(new THREE.CylinderGeometry(0.0002, 0.00012, 0.016, 4), black); dn.position.set(s * 0.0085, -0.0055, (i - 1) * 0.006); dn.rotation.set((i - 1) * 0.45, 0, s * 0.18); L.add(dn)
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.00024, 0.00024, 0.0012, 4), new THREE.MeshBasicMaterial({ color: 0xe8e8e0 })); band.position.copy(dn.position); band.rotation.copy(dn.rotation); L.add(band)
+    const up = new THREE.Mesh(new THREE.CylinderGeometry(0.0003, 0.00028, 0.01, 5), black); up.position.set(s * 0.004, 0.0015, 0); up.rotation.z = s * 1.2; L.add(up)
+    const dn = new THREE.Mesh(new THREE.CylinderGeometry(0.00026, 0.00014, 0.016, 5), black); dn.position.set(s * 0.0085, -0.0055, (i - 1) * 0.006); dn.rotation.set((i - 1) * 0.45, 0, s * 0.18); L.add(dn)
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0003, 0.0003, 0.0012, 5), new THREE.MeshStandardMaterial({ color: 0x8c8a84, roughness: 0.6 })); band.position.copy(dn.position); band.rotation.copy(dn.rotation); L.add(band)
     legs.push(L)
   }
   // 羽（透明・はばたきでぶれる）
