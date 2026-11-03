@@ -1,8 +1,8 @@
 // 夏の夜の蚊。自分が蚊になって、寝ている家族の血を吸う。3D・蚊の斜め後ろからのカメラ
 // 物理と判定は固定60Hz（performance.now で数える）。描画は毎フレーム
 import * as THREE from 'three'
-import { buildRoom, futon, towel, ROOM } from './room.js?v=2'
-import { loadFamily, Sleeper, Cat, makeMosquito } from './family.js?v=2'
+import { buildRoom, futon, towel, ROOM } from './room.js?v=3'
+import { loadFamily, Sleeper, Cat, makeMosquito } from './family.js?v=3'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -590,7 +590,7 @@ function endNight() {
   hands.forEach(h => h.g.visible = false); uchiwa.visible = false; can.visible = false
   const r = W.result = score()
   drawReport(r)
-  show('result'); $('hud').classList.add('hidden'); tip(null)
+  show('result'); $('hud').classList.add('hidden'); tip(null); say.t = 0; say.el.classList.add('hidden')
   const tx = T().postText({ mg: r.mg, bites: r.bites, rank: r.rankName }) + ' ' + T().tags
   $('btnPost').href = 'https://x.com/intent/post?text=' + encodeURIComponent(tx) + '&url=' + encodeURIComponent('https://tom3games.github.io/night-mosquito/')
   sfx(r.alive && r.rank >= 2 ? 'win' : 'lose', { vol: 0.7, jitter: 0 }); setTimeout(() => sfx('rank', { vol: 0.8, jitter: 0 }), 900)
