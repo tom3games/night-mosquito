@@ -599,15 +599,15 @@ function drawPoster(r, stamped) {
   const kid = r.killer || 'dad'
   drawImg(g, `${kid}_walk`, 190, 1188, kid === 'cat' || kid === 'pig' ? 150 : 250)
   g.textAlign = 'left'; g.fillStyle = '#2b1c10'; g.font = `600 ${lang === 'ja' ? 36 : 30}px "Klee One"`
-  const fam = FAM[kid]; g.fillText(`${P.by}: ${fam.name[lang]}`, 320, 1000)
-  g.font = `600 ${lang === 'ja' ? 30 : 26}px "Klee One"`; (T().deathNote[r.death] || '').split('\n').forEach((s, i) => g.fillText(s, 320, 1048 + i * 40))
-  if (r.near > 0) { g.font = `600 ${lang === 'ja' ? 28 : 24}px "Klee One"`; g.fillStyle = '#5b4a2f'; g.fillText(`${P.near} ${r.near}${P.times}`, 320, 1160) }
+  const fam = FAM[kid]; g.fillText(`${P.by}: ${fam.name[lang]}`, 320, 975)
+  g.font = `600 ${lang === 'ja' ? 30 : 26}px "Klee One"`; (T().deathNote[r.death] || '').split('\n').forEach((s, i) => g.fillText(s, 320, 1032 + i * 40))
+  if (r.near > 0) { g.font = `600 ${lang === 'ja' ? 28 : 24}px "Klee One"`; g.fillStyle = '#5b4a2f'; g.fillText(`${P.near} ${r.near}${P.times}`, 320, 1150) }
   // 新記録の走り書き
   if (r.record) { g.save(); g.translate(742, 262); g.rotate(0.16); g.fillStyle = '#a81f14'; g.font = `${lang === 'ja' ? 52 : 40}px ${F}`; g.textAlign = 'center'; g.fillText(P.record, 0, 0); g.restore() }
   // 判子（発表）
   if (stamped) {
     const name = r.rankName
-    g.save(); g.translate(690, 1085); g.rotate(-0.2); g.strokeStyle = '#c0261a'; g.fillStyle = '#c0261a'; g.globalAlpha = 0.9; g.lineWidth = 10; g.beginPath(); g.arc(0, 0, 138, 0, 7); g.stroke(); g.lineWidth = 3.5; g.beginPath(); g.arc(0, 0, 122, 0, 7); g.stroke()
+    g.save(); g.translate(722, 1108); g.rotate(-0.2); g.scale(0.8, 0.8); g.strokeStyle = '#c0261a'; g.fillStyle = '#c0261a'; g.globalAlpha = 0.9; g.lineWidth = 10; g.beginPath(); g.arc(0, 0, 138, 0, 7); g.stroke(); g.lineWidth = 3.5; g.beginPath(); g.arc(0, 0, 122, 0, 7); g.stroke()
     g.textAlign = 'center'; g.textBaseline = 'middle'
     const parts = T().rankLines[r.rank]
     const fs = lang === 'ja' ? (Math.max(...parts.map(s => s.length)) > 3 ? 50 : 60) : 38
