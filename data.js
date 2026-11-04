@@ -1,123 +1,110 @@
-// 夏の夜の蚊: 文言（日英）と家族のデータ。処理は js/game.js
+// 夏の夜の蚊: 文言（日英）と追っ手のデータ。処理は js/game.js
 window.NM_TEXT = {
   ja: {
-    title: '夏の夜の蚊', sub: '蚊になって、寝ている家族の血を吸う。耳元で鳴くと手が飛んでくる。',
-    start: '夜を飛ぶ', howBtn: '遊び方', lang: 'English', more: 'ほかのバカゲー', soundOn: '音あり', soundOff: '音なし',
-    loading: '家族が寝つくまで待機中', loadingDone: '寝静まりました',
-    howTitle: '遊び方',
+    title: '夏の夜の蚊', sub: '起きた家族の攻撃を飛び回ってかわせ。\n何秒生きのびる？',
+    start: '飛び立つ', howBtn: '遊び方', lang: 'English', more: 'ほかのバカゲー', soundOn: '音 オン', soundOff: '音 オフ',
+    loading: '家族が目を覚ますまで待機中', loadingDone: '起きました', best: '最高', sec: '秒',
+    howTitle: '回覧 蚊の駆除について',
     how: [
-      'あなたは蚊。23時から朝5時までに、寝ている家族の血を吸う。',
-      '肌がうっすら光ったら刺せる。吸うほどお腹が赤く重くなる。壁や天井にとまると消化できる。',
-      '耳元を飛ぶと起きかける。寝返り・寝言・しかめっつらが合図。起きたら手やうちわが飛んでくる。',
-      '蚊取り線香の煙を吸うと落ちる。扇風機の風には流される。',
+      '起きた家族が部屋じゅう追いかけてくる。あなたは蚊。当たったら一発でおしまい。',
+      '輪が追ってきて赤くなると、そこに叩きが落ちる。輪から逃げる。スプレーの霧に長くいるとむせて落ちる。',
+      '人も攻撃も時間とともに増える。画面の端の顔は外にいる人。生きのびた秒数が記録。',
     ],
-    keysPC: [['WASD', '飛ぶ'], ['Space / Shift', '上がる / 下がる'], ['ドラッグ', '見回す'], ['E', '刺す・飛び立つ']],
-    keysTouch: [['左下のまる', '飛ぶ（カメラの向きへ）'], ['右の羽', '上がる / 下がる'], ['右下', '刺す・飛び立つ'], ['右側をなぞる', '見回す']],
+    who: [['dad', '父', 'ハエたたき'], ['mom', '母', 'スプレー'], ['kid', 'たろう', '虫取り網'], ['gramps', 'じいちゃん', '入れ歯']],
+    keysTouch: [['左下のまる', '飛ぶ'], ['右の羽', '上がる / 下がる'], ['画面をなぞる', '見回す']],
     ok: 'わかった',
-    credit: '人物 Kenney（CC0）／音 Wikimedia Commons・OpenGameArt の録音（CC0・パブリックドメイン）',
-    lbl: { off: '刺す', bite: '刺す', rest: 'とまる', leave: '飛び立つ' },
-    again: 'もう一晩', save: '画像を保存', post: 'Xでポスト', toTitle: 'タイトルへ',
+    credit: '絵は画像生成で作成／音楽と効果音は OpenGameArt・Wikimedia Commons の録音（CC0・パブリックドメイン）',
+    again: 'もう一回', save: '画像を保存', post: 'Xでポスト', toTitle: 'タイトルへ',
     resume: '続ける', quit: 'やめる', paused: '一時停止',
-    tut: {
-      moveTouch: '左下のスティックで飛ぶ', movePC: 'WASD で飛ぶ・ドラッグで見回す',
-      find: '足や腕の光る所へ', biteTouch: '光ったら右下で刺す', bitePC: '光ったら E で刺す',
-      leave: 'もう一回押すと飛び立つ', rest: '重い。壁にとまって消化',
+    tut: { move: '左下のスティックで飛ぶ', wing: '右の羽で上がる・下がる', dodge: '輪から逃げて' },
+    near: 'ギリ', fogWarn: '最終手段や',
+    death: { swat: 'ぺちっ', spray: 'げほっ', net: 'ばさっ', teeth: 'がぶっ', zap: 'ばちっ', cat: 'にゃっ', smoke: 'げほっ', fog: 'げほっ' },
+    deathNote: {
+      swat: 'ハエたたきで\n仕留められた', spray: 'スプレーで\nむせて落ちた', net: '虫取り網で\n捕まった', teeth: '入れ歯に\n噛まれた',
+      zap: '電撃ラケットで\n焦げた', cat: '猫パンチを\nくらった', smoke: '蚊やり豚の煙で\nむせた', fog: '部屋ごと\n燻された',
     },
-    say: {
-      hairy: '毛で届かない', full: 'もう入らない', dry: 'もう吸えない。次へ', smoke: 'げほっ', wind: 'うわっ風',
-      lightOn: '電気ついた', dawn: '夜明け',
+    poster: {
+      wanted: '指名手配', name: '夏の夜の蚊', crime: '罪状 羽音', alive: '逃亡', sec: '秒', bounty: '懸賞金', yen: '円',
+      by: '討伐', record: '新記録', near: 'ギリ', times: '回',
     },
-    death: { slap: 'ぺちっ', uchiwa: 'ばしっ', spray: 'しゅー', smoke: 'ぽとっ', cat: 'にゃっ' },
-    deathNote: { slap: '手のひらで仕留められた', uchiwa: 'うちわで叩き落とされた', spray: '殺虫スプレーで落ちた', smoke: '蚊取り線香の煙で落ちた', cat: '猫パンチをくらった' },
-    report: {
-      head: 'かゆみ報告書', date: '8月14日 朝5時', blood: '吸った血', bites: '刺した数', where: '刺した場所',
-      alive: '朝まで生きのびた', none: 'なし', mg: 'mg', ka: 'か所', wall: '壁のシミ',
-    },
-    ranks: ['ただの羽音', 'ちょい吸い', '一晩の常連', '一家のかゆみ担当', '伝説の夏の蚊'],
-    postText: (r) => `夏の夜の蚊で ${r.mg}mg 吸って ${r.bites}か所刺した。判定「${r.rank}」`,
+    ranks: ['ただの羽音', '耳元の常連', '町内会の議題', '全国指名手配', '伝説の夏の蚊'],
+    rankLines: [['ただの', '羽音'], ['耳元の', '常連'], ['町内会の', '議題'], ['全国', '指名手配'], ['伝説の', '夏の蚊']],
+    postText: r => `夏の夜の蚊で ${r.sec}秒 逃げた。懸賞金 ${r.bounty}円「${r.rank}」`,
     tags: '#夏の夜の蚊 #バカゲー',
   },
   en: {
-    title: 'Summer Night Mosquito', sub: 'You are a mosquito. Drink the sleeping family\'s blood. Buzz by their ears and a hand comes flying.',
-    start: 'Fly into the night', howBtn: 'How to play', lang: '日本語', more: 'More silly games', soundOn: 'Sound on', soundOff: 'Muted',
-    loading: 'Waiting for the family to fall asleep', loadingDone: 'Everyone is asleep',
-    howTitle: 'How to play',
+    title: 'Summer Night Mosquito', sub: 'The family is awake and swinging. Fly around them. How long can you last?',
+    start: 'Take off', howBtn: 'How to play', lang: '日本語', more: 'More silly games', soundOn: 'Sound: on', soundOff: 'Sound: off',
+    loading: 'Waiting for the family to wake up', loadingDone: 'They are up', best: 'Best', sec: 's',
+    howTitle: 'Notice: about the mosquito',
     how: [
-      'You are a mosquito. From 11 PM to 5 AM, drink the sleeping family\'s blood.',
-      'Bare skin glows when you can bite. Your belly grows red and heavy. Rest on a wall or ceiling to digest.',
-      'Buzzing near an ear wakes people. Watch for tossing, sleep talk and frowns. Awake people swat.',
-      'Coil smoke knocks you out. The fan blows you away.',
+      'You are the mosquito. The family chases you around the room. One hit and it is over.',
+      'A ring follows you. When it turns red, the swat lands there. Get out. Stay in spray too long and you drop.',
+      'More people, more attacks over time. Faces at the screen edge are people off screen. Your score is how long you last.',
     ],
-    keysPC: [['WASD', 'Fly'], ['Space / Shift', 'Up / Down'], ['Drag', 'Look'], ['E', 'Bite / take off']],
-    keysTouch: [['Bottom-left circle', 'Fly where you look'], ['Wings', 'Up / Down'], ['Bottom right', 'Bite / take off'], ['Drag right side', 'Look']],
+    who: [['dad', 'Dad', 'Swatter'], ['mom', 'Mom', 'Spray'], ['kid', 'Taro', 'Bug net'], ['gramps', 'Grandpa', 'Dentures']],
+    keysTouch: [['Bottom-left circle', 'Fly'], ['Wings', 'Up / Down'], ['Drag the screen', 'Look']],
     ok: 'Got it',
-    credit: 'Characters Kenney (CC0) / Sounds: recordings from Wikimedia Commons and OpenGameArt (CC0, public domain)',
-    lbl: { off: 'Bite', bite: 'Bite', rest: 'Land', leave: 'Take off' },
-    again: 'Another night', save: 'Save image', post: 'Post on X', toTitle: 'Title',
+    credit: 'Art made with image generation / Music and sounds: recordings from OpenGameArt and Wikimedia Commons (CC0, public domain)',
+    again: 'Again', save: 'Save image', post: 'Post on X', toTitle: 'Title',
     resume: 'Resume', quit: 'Quit', paused: 'Paused',
-    tut: {
-      moveTouch: 'Fly with the stick', movePC: 'WASD to fly, drag to look',
-      find: 'Find glowing skin', biteTouch: 'Glowing? Tap bite', bitePC: 'Glowing? Press E',
-      leave: 'Press again to take off', rest: 'Too heavy. Rest on a wall',
+    tut: { move: 'Fly with the stick', wing: 'Wings go up and down', dodge: 'Get out of the ring' },
+    near: 'Close!', fogWarn: 'Last resort.',
+    death: { swat: 'SPLAT', spray: 'COUGH', net: 'SWOOP', teeth: 'CHOMP', zap: 'ZAP', cat: 'BONK', smoke: 'COUGH', fog: 'COUGH' },
+    deathNote: {
+      swat: 'Swatted flat', spray: 'Choked on\nbug spray', net: 'Caught in\na bug net', teeth: 'Bitten by\nflying dentures',
+      zap: 'Fried by\na zapper racket', cat: 'Taken out by\na cat paw', smoke: 'Choked by\nthe coil pig', fog: 'Fumigated with\nthe whole room',
     },
-    say: {
-      hairy: 'Too hairy', full: 'Belly is full', dry: 'Dry. Find another spot', smoke: 'Cough', wind: 'Whoa, wind',
-      lightOn: 'Lights on', dawn: 'Dawn',
+    poster: {
+      wanted: 'WANTED', name: 'Summer Night Mosquito', crime: 'Crime: buzzing', alive: 'At large', sec: 's', bounty: 'Bounty', yen: ' yen',
+      by: 'Taken down by', record: 'New record', near: 'Close calls', times: '',
     },
-    death: { slap: 'SLAP', uchiwa: 'WHACK', spray: 'PSSHH', smoke: 'PLOP', cat: 'MEOW' },
-    deathNote: { slap: 'Swatted by a palm', uchiwa: 'Knocked down by a fan', spray: 'Bug spray got you', smoke: 'Fell in the coil smoke', cat: 'Cat punch' },
-    report: {
-      head: 'Itch Report', date: 'Aug 14, 5 AM', blood: 'Blood', bites: 'Bites', where: 'Where',
-      alive: 'Survived till morning', none: 'none', mg: 'mg', ka: '', wall: 'Wall stain',
-    },
-    ranks: ['Just a buzz', 'A little sip', 'Regular visitor', 'Family itch officer', 'Legendary summer mosquito'],
-    postText: (r) => `Summer Night Mosquito: drank ${r.mg}mg, ${r.bites} bites. Rank "${r.rank}"`,
+    ranks: ['Just a buzz', 'Ear regular', 'Town meeting topic', 'Nationwide wanted', 'Legend of summer'],
+    rankLines: [['Just', 'a buzz'], ['Ear', 'regular'], ['Town', 'meeting', 'topic'], ['Nationwide', 'wanted'], ['Legend', 'of summer']],
+    postText: r => `I lasted ${r.sec}s in Summer Night Mosquito. Bounty ${r.bounty} yen: "${r.rank}"`,
     tags: '#SummerNightMosquito',
   },
 }
 
-// 家族。寝る場所・寝つきの深さ・寝言・朝の一言
-// sens: 羽音への敏感さ（大きいほど起きやすい）。wake: 起きた時にやること
+// 追っ手。h: 立ち絵の身長(m)、speed: 足の速さ、kind: 攻撃、wake/hit/win: 一言（12字前後）
 window.NM_FAMILY = {
   dad: {
-    name: { ja: '父', en: 'Dad' }, file: 'male-d', scale: 1.6, sens: 0.75, wake: 'slap',
-    talk: {
-      ja: ['部長…それは経費です…', 'あと5分…いや5年…', '唐揚げにレモン…かけたん誰や…', 'ボーナス…ボーナス…', 'わしの…プリン…', 'その企画…通りまぁす…'],
-      en: ['Boss... it\'s a business expense...', 'Five more minutes... no, years...', 'Who put lemon... on my karaage...', 'Bonus... bonus...', 'My... pudding...', 'Proposal... approved...'],
-    },
-    react: { ja: ['ん…？', 'なんや…', 'ぶーんて…'], en: ['Hm...?', 'What...', 'That buzz...'] },
+    h: 1.72, speed: 1.25, kind: 'swat', name: { ja: '父', en: 'Dad' },
+    wake: { ja: ['明日も早いんじゃ', '何時や思てんねん'], en: ['I work tomorrow!', 'Do you know the time?'] },
+    hit: { ja: ['そこやっ', '逃げんなコラ', '部長より憎い', 'この一発に残業を'], en: ['There!', 'Get back here!', 'Worse than my boss!', 'This is for overtime!'] },
+    win: { ja: ['よっしゃ寝れる', 'ローンより軽いわ'], en: ['Finally, sleep.', 'Lighter than my loan.'] },
   },
   mom: {
-    name: { ja: '母', en: 'Mom' }, file: 'female-d', scale: 1.5, sens: 1.35, wake: 'uchiwa',
-    talk: {
-      ja: ['ガス…消したっけ…', '冷蔵庫のプリン…名前書いたのに…', 'お父さん…いびき…', '特売…卵…お一人様…'],
-      en: ['Did I... turn off the gas...', 'My pudding... had my name on it...', 'Honey... snoring...', 'Eggs on sale... one per person...'],
-    },
-    react: { ja: ['…蚊？', 'ちょっと…', 'いる。絶対いる'], en: ['...a mosquito?', 'Ugh...', 'It\'s here. I know it'] },
+    h: 1.62, speed: 1.05, kind: 'spray', name: { ja: '母', en: 'Mom' },
+    wake: { ja: ['網戸閉めてって言うた', '誰が開けたん'], en: ['Who left the screen open?', 'I told you all!'] },
+    hit: { ja: ['シューっといくで', '洗濯より厄介', '家計より憎い', 'はい息止めて'], en: ['Hold your breath.', 'Worse than laundry!', 'Worse than the bills!', 'Psssht time.'] },
+    win: { ja: ['はい、おしまい', '明日ゴミの日やし'], en: ['And done.', 'Trash day tomorrow.'] },
   },
   kid: {
-    name: { ja: 'たろう', en: 'Taro' }, file: 'male-f', scale: 1.1, sens: 0.6, wake: 'flail', roll: true,
-    talk: {
-      ja: ['カブトムシ…でっか…', 'ぼくが…キャプテン…', '宿題は…犬が…', 'おかわり…', 'うんこ…でた…'],
-      en: ['Beetle... so big...', 'I\'m... the captain...', 'The dog... ate my homework...', 'Seconds please...', 'Pooped...'],
-    },
-    react: { ja: ['むにゃ', 'やめろー', 'えいっ'], en: ['Mmph', 'Stoppit', 'Hyah'] },
+    h: 1.3, speed: 1.7, kind: 'net', name: { ja: 'たろう', en: 'Taro' },
+    wake: { ja: ['自由研究にする！', '蚊や！蚊やで！'], en: ['Summer project!', 'A mosquito!'] },
+    hit: { ja: ['つかまえたる！', '100円もらえる！', '宿題これでええ'], en: ['Gotcha!', 'Worth 100 yen!', 'This is my homework!'] },
+    win: { ja: ['先生に見せる！', '名前はケンタ！'], en: ['Showing my teacher!', 'I name it Kenta!'] },
   },
   gramps: {
-    name: { ja: 'じいちゃん', en: 'Grandpa' }, file: 'male-b', scale: 1.5, sens: 0.45, wake: 'spray', rare: true,
-    talk: {
-      ja: ['ふがふが…', 'ばあさんや…メシは…', 'わしの歯…どこや…', '昭和の蚊は…もっと…', 'ふが…'],
-      en: ['Fuga fuga...', 'Dear... is dinner...', 'Where... are my teeth...', 'Back in my day... mosquitoes...', 'Fuga...'],
-    },
-    react: { ja: ['ふが？', 'なんじゃ', 'スプレーどこや'], en: ['Fuga?', 'What now', 'Where\'s the spray'] },
+    h: 1.42, speed: 0.72, kind: 'teeth', name: { ja: 'じいちゃん', en: 'Grandpa' },
+    wake: { ja: ['ふがふが', 'わしの歯ぁ飛ばす'], en: ['Fgh fgh.', 'My teeth will do it.'] },
+    hit: { ja: ['ふが！', '歯をくらえ', '昔はもっとおった', '取ってこい歯'], en: ['Fgh!', 'Eat my teeth!', 'More of you back then!', 'Go, teeth!'] },
+    win: { ja: ['ふがっふがっ', '歯はどこや'], en: ['Fgh fgh fgh.', 'Where are my teeth?'] },
   },
-}
-
-// 朝の一言（刺された数で変わる）
-window.NM_MORNING = {
-  dad: { ja: ['よう寝たわ', 'なんか足かゆいな', 'おでこに出来てる…会議あるのに', '全身かゆい。今日休む'], en: ['Slept great', 'My leg itches', 'One on my forehead... I have a meeting', 'Itchy all over. Calling in sick'] },
-  mom: { ja: ['網戸ちゃんと閉めてよ', '1か所だけ。許さない', '私ばっかり刺されてる', '今夜は全部屋スプレー'], en: ['Close the screen door', 'Just one. Unforgivable', 'Why always me', 'Spraying every room tonight'] },
-  kid: { ja: ['刺されてない！', '見て！ぷっくり！', '学校で自慢する', 'かゆいけど強くなった気がする'], en: ['No bites!', 'Look! A bump!', 'Showing it off at school', 'Itchy but I feel stronger'] },
-  gramps: { ja: ['年寄りの血はまずいんか', 'ふが（かゆい）', '昭和の蚊のほうが強かった', '入れ歯がかゆい'], en: ['Is old blood not tasty?', 'Fuga (itchy)', 'Mosquitoes were tougher back then', 'My dentures itch'] },
-  cat: { ja: ['にゃーん（見てたぞ）'], en: ['Meow (I saw you)'] },
+  neighbor: {
+    h: 1.75, speed: 1.1, kind: 'zap', name: { ja: '隣のおっちゃん', en: 'The neighbor' },
+    wake: { ja: ['音で隣から来たで', 'ええ棒持ってきた'], en: ['Heard you from next door.', 'Brought my racket.'] },
+    hit: { ja: ['バチバチいくで', 'ええ音出してや', '勝手に上がったで'], en: ['Crackle time!', 'Sing for me!', 'I let myself in.'] },
+    win: { ja: ['ええ音したわ', 'ほな帰るわ'], en: ['Nice sound.', 'I will head home.'] },
+  },
+  cat: {
+    h: 0.78, speed: 1.8, kind: 'leap', name: { ja: 'ねこ', en: 'The cat' },
+    wake: { ja: ['にゃ', '…'], en: ['Meow.', '...'] }, hit: { ja: ['にゃっ', 'にゃ！'], en: ['Mrow!', 'Meow!'] }, win: { ja: ['ごろごろ'], en: ['Purr.'] },
+  },
+  pig: {
+    h: 0.72, speed: 0.6, kind: 'smoke', name: { ja: '蚊やり豚', en: 'The coil pig' },
+    wake: { ja: ['ぶひ', '線香切らしてへん'], en: ['Oink.', 'Coil is still lit.'] },
+    hit: { ja: ['ぶふー', 'ぶひひ'], en: ['Pfffft.', 'Oink oink.'] }, win: { ja: ['ぶひひ'], en: ['Oink oink.'] },
+  },
 }

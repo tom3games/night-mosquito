@@ -1,0 +1,10 @@
+ART STYLE (strict): Japanese gag-manga illustration for a silly comedy game, cute and funny. Thick, confident, slightly wobbly hand-inked black outlines. Flat cel colors with at most one simple shadow tone. Big simple expressive cartoon faces with few lines, no wrinkles, round chunky simplified bodies about 3 heads tall, no anatomical detail. Warm, friendly, never gross. No realism, no photo, no 3D render, no gradients, no airbrush, no texture noise, no blood. Not based on any existing franchise.
+
+SUBJECT: a character sheet of one single character: a chubby funny Japanese calico house cat (white, orange and black patches) with a flat grumpy face and huge round eyes. Same art style as the reference image. It is a cartoon cat, standing or crouching.
+
+Draw EXACTLY THREE full-body poses of this same character, side by side in three equal columns, each facing the viewer, none overlapping, wide empty gaps between them, feet on the same baseline, every pose drawn at the same scale:
+1. LEFT: walking toward the viewer on four legs, staring intensely with huge pupils.
+2. CENTER: crouched low, butt raised and wiggling with motion lines, about to pounce, eyes locked on the viewer.
+3. RIGHT: leaping up in mid-air toward the viewer with one giant paw thrust forward, claws-free cute paw, mouth open.
+
+BACKGROUND: perfectly flat pure chroma green #00FF00 across the whole image, no floor, no shadow, no text, no speech bubbles, no lettering, no extra objects. Do not use any green on the character. Whole figure inside the frame with margin on all sides.

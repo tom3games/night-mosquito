@@ -54,7 +54,7 @@ const Snd = {
     if (!url) return
     const start = () => {
       const buf = this.bufs[url]; if (!buf || buf === 'loading') return setTimeout(start, 120)
-      if (this.loops[slot] && this.loops[slot].url !== url) return
+      if (!this.loops[slot] || this.loops[slot].url !== url) return   // 読み込み中に止められたら鳴らさない
       const s = c.createBufferSource(), g = c.createGain(); s.buffer = buf; s.loop = true; g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.linearRampToValueAtTime(vol, c.currentTime + fade)
       s.connect(g); g.connect(this.bed); s.start(); this.loops[slot] = { url, vol, node: s, g }; this.played['loop:' + slot] = (this.played['loop:' + slot] || 0) + 1
     }

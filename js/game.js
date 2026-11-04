@@ -1,188 +1,178 @@
-// 夏の夜の蚊。自分が蚊になって、寝ている家族の血を吸う。3D・蚊の斜め後ろからのカメラ
-// 物理と判定は固定60Hz（performance.now で数える）。描画は毎フレーム
+// 夏の夜の蚊。自分が蚊になって、起きた家族の攻撃を飛び回ってかわす。スコアは生きのびた秒数
+// 3D の部屋に、切り絵のように立つイラストの人物。カメラは蚊の斜め後ろ。物理と判定は固定60Hz（performance.now で数える）
 import * as THREE from 'three'
-import { buildRoom, futon, towel, ROOM } from './room.js?v=3'
-import { loadFamily, Sleeper, Cat, makeMosquito } from './family.js?v=3'
+import { buildRoom, ROOM } from './room.js?v=4'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
-const TX = window.NM_TEXT, FAM = window.NM_FAMILY, MORN = window.NM_MORNING
-const coarse = matchMedia('(pointer: coarse)').matches
-const LOW = coarse || Math.min(screen.width, screen.height) < 700
-const NIGHT = 180                    // 1晩の秒数（23時→5時）
+const TX = window.NM_TEXT, FAM = window.NM_FAMILY
 const STEP = 1 / 60
+const FOG_T = 150, FOG_DUR = 44       // くん煙: 150秒から床→天井へ上がり、44秒で部屋が埋まる（必ず終わる）
+const M_R = 0.07                      // 蚊の当たり半径
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const lerp = (a, b, k) => a + (b - a) * k
-const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t) }
+const fmt = s => s.toFixed(1)
 
 let lang = /^ja/.test(navigator.language || 'ja') ? 'ja' : 'en'
 try { const l = localStorage.getItem('nm_lang'); if (l) lang = l } catch (e) {}
 let muted = false
 try { muted = localStorage.getItem('nm_mute') === '1' } catch (e) {}
 let tutDone = false
-try { tutDone = localStorage.getItem('nm_tut') === '1' } catch (e) {}
+try { tutDone = localStorage.getItem('nm_tut2') === '1' } catch (e) {}
+let best = 0
+try { best = parseFloat(localStorage.getItem('nm_best')) || 0 } catch (e) {}
 const T = () => TX[lang]
 
 // ---------------------------------------------------------------- 描画の土台
-const renderer = new THREE.WebGLRenderer({ antialias: !LOW, powerPreference: 'high-performance', preserveDrawingBuffer: true })
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, LOW ? 1.5 : 2))
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true })
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2))
 renderer.outputColorSpace = THREE.SRGBColorSpace
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15
-renderer.shadowMap.enabled = !LOW; renderer.shadowMap.type = THREE.PCFSoftShadowMap
 $('view').appendChild(renderer.domElement)
 const scene = new THREE.Scene()
-scene.background = new THREE.Color(0x0b0d16)
-scene.fog = new THREE.Fog(0x0b0d16, 3.5, 8)
-const camera = new THREE.PerspectiveCamera(64, 1, 0.004, 20)
+scene.background = new THREE.Color(0xe9d9ac)
+const camera = new THREE.PerspectiveCamera(74, 1, 0.05, 30)
 camera.rotation.order = 'YXZ'
 
 const manager = new THREE.LoadingManager()
-let loadFrac = 0
-manager.onProgress = (u, a, b) => { loadFrac = a / Math.max(1, b); bootProgress(loadFrac) }
-function bootProgress(f) { const b = $('boot'); if (b) b.style.setProperty('--p', f.toFixed(3)) }
-
-const room = buildRoom(scene, { low: LOW })
+manager.onProgress = (u, a, b) => { const el = $('boot'); if (el) el.style.setProperty('--p', (a / Math.max(1, b)).toFixed(3)) }
+const TEX = {}
+let SPR = {}
+function loadAll() {
+  return fetch('img/sprites.json?v=4').then(r => r.json()).then(man => {
+    SPR = man
+    const loader = new THREE.TextureLoader(manager)
+    return Promise.all(Object.keys(man).map(n => new Promise((ok, ng) => loader.load(`img/${n}.webp?v=4`, t => { t.colorSpace = THREE.SRGBColorSpace; TEX[n] = t; ok() }, undefined, ng))))
+  })
+}
 
 // ---------------------------------------------------------------- 音（録音素材だけ）
 Snd.def({
-  slap: ['snd/slap1.mp3', 'snd/slap2.mp3', 'snd/slap3.mp3'], squish: ['snd/squish1.mp3', 'snd/squish2.mp3'],
+  slap: ['snd/slap1.mp3', 'snd/slap2.mp3', 'snd/slap3.mp3'], thwack: ['snd/thwack1.mp3', 'snd/thwack2.mp3', 'snd/thwack3.mp3'], squish: ['snd/squish1.mp3', 'snd/squish2.mp3'],
   swish: ['snd/swish1.mp3', 'snd/swish2.mp3', 'snd/swish3.mp3'], cloth: ['snd/cloth1.mp3', 'snd/cloth2.mp3', 'snd/cloth3.mp3'],
-  grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], click: 'snd/click.mp3', switch: 'snd/switch.mp3',
-  spray: 'snd/spray.mp3', meow: 'snd/meow.mp3', pop: ['snd/pop1.mp3', 'snd/pop2.mp3'], thud: 'snd/thud.mp3',
-  win: 'snd/win.mp3', lose: 'snd/lose.mp3', rank: 'snd/rank.mp3', birds: 'snd/birds.mp3', chime: 'snd/chime.mp3', suck: 'snd/suck1.mp3',
+  grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], click: 'snd/click.mp3', spray: 'snd/spray.mp3', shake: ['snd/shake1.mp3', 'snd/shake2.mp3'], zap: ['snd/zap1.mp3', 'snd/zap2.mp3'],
+  meow: 'snd/meow.mp3', pop: ['snd/pop1.mp3', 'snd/pop2.mp3'], thud: 'snd/thud.mp3', win: 'snd/win.mp3', lose: 'snd/lose.mp3', rank: 'snd/rank.mp3', chime: 'snd/chime.mp3', squeak: 'snd/squeak.mp3',
 })
 Snd.setMute(muted)
 const sfx = (n, o) => Snd.play(n, o)
-const LOOPS = { amb: ['snd/crickets.mp3', 0.28], fan: ['snd/fan.mp3', 0], buzz: ['snd/buzz.mp3', 0], snore: ['snd/snore.mp3', 0] }
 let ambOn = false
-function audioOn() { Snd.init(); if (!ambOn && Snd.ctx) { ambOn = true; for (const k in LOOPS) Snd.loop(k, LOOPS[k][0], Math.max(0.0001, LOOPS[k][1])) } }
+function audioOn() { Snd.init(); if (!ambOn && Snd.ctx) { ambOn = true; Snd.loop('amb', 'snd/crickets.mp3', 0.16); Snd.loop('buzz', 'snd/buzz.mp3', 0.0001) } }
 function loopVol(slot, v, rate) { const l = Snd.loops[slot]; if (!l || !l.g || !Snd.ctx) return; const t = Snd.ctx.currentTime; l.g.gain.setTargetAtTime(Math.max(0.0001, v), t, 0.08); if (rate && l.node) l.node.playbackRate.setTargetAtTime(rate, t, 0.1) }
 
-// ---------------------------------------------------------------- 乱数（夜ごとのくじ）
 function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
 
+// ---------------------------------------------------------------- 切り絵の部品
+const GEO_B = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0)   // 足元が原点
+const GEO_C = new THREE.PlaneGeometry(1, 1)
+const cutMat = (name, o = {}) => new THREE.MeshBasicMaterial({ map: name ? TEX[name] : null, transparent: true, depthWrite: false, side: THREE.DoubleSide, ...o })
+const blobTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.fillStyle = 'rgba(40,28,14,.55)'; g.beginPath(); g.ellipse(32, 32, 30, 30, 0, 0, 7); g.fill(); return new THREE.CanvasTexture(c) })()
+function shadowMesh(s) { const m = new THREE.Mesh(new THREE.PlaneGeometry(s, s), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.y = 0.015; m.renderOrder = 1; scene.add(m); return m }
+// 赤い輪: 落ちてくる場所の予告
+const ringTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); g.strokeStyle = '#fff'; g.lineWidth = 10; g.beginPath(); g.arc(128, 128, 112, 0, 7); g.stroke(); g.fillStyle = 'rgba(255,255,255,.16)'; g.beginPath(); g.arc(128, 128, 104, 0, 7); g.fill(); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t })()
+const RING_K = 2 * 128 / 112
+const rings = []
+function getRing() { let r = rings.find(x => !x.busy); if (!r) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: ringTex, transparent: true, depthTest: false, depthWrite: false })); s.renderOrder = 22; const f = new THREE.Mesh(new THREE.RingGeometry(0.86, 1, 28), new THREE.MeshBasicMaterial({ color: 0xe02a1c, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide })); f.rotation.x = -Math.PI / 2; f.position.y = 0.02; f.renderOrder = 2; scene.add(s, f); r = { s, f, busy: false }; rings.push(r) } r.busy = true; r.s.visible = r.f.visible = true; return r }
+function freeRing(r) { if (!r) return; r.busy = false; r.s.visible = r.f.visible = false }
+function placeRing(r, pos, rad, k, locked) { const sc = rad * RING_K * (1 + (1 - k) * 0.7); r.s.position.copy(pos); r.s.scale.set(sc, sc, 1); r.s.material.color.set(locked ? 0xff2412 : 0xffb400); r.f.position.set(pos.x, 0.02, pos.z); r.f.scale.setScalar(rad); r.f.material.color.set(locked ? 0xe02a1c : 0xd98a00) }
+
 // ---------------------------------------------------------------- 状態
-const mos = makeMosquito(); scene.add(mos.root)
-const M = {   // 蚊
-  pos: new THREE.Vector3(), vel: new THREE.Vector3(), full: 0, total: 0, dizzy: 0, state: 'fly', perch: null, land: 0, landFrom: new THREE.Vector3(),
-  wind: 0, flap: 0, up: new THREE.Vector3(0, 1, 0), alive: true, death: null,
-}
-let W = null   // 1晩の状態
+let room, mos, cone, sector, swatter, netProp, fog
+const bursts = [], puffs = [], teethPool = [], columns = []
+const M = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), cough: 0, alive: true, death: null, frame: null, panic: 0, flip: 1 }
+let W = null
 let mode = 'loading', paused = false, simAcc = 0, lastT = 0, frozen = false
-let camDist = 0.1, camYaw = 0, camPitch = -0.15, shake = 0, flash = 0, hitStop = 0, deathT = 0, glowTarget = null, nearSurface = null
+let camYaw = 0, camPitch = -0.12, shake = 0, flash = 0, hitStop = 0, deathT = 0, lastLook = -9, noAuto = false
 const say = { el: $('say'), who: null, t: 0 }
 let testInput = null, camOverride = null
 const people = []
-let cat = null, futons = [], props = []
 
-// 光る肌（刺せる場所の目印）
-const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,214,190,1)'); gr.addColorStop(0.4, 'rgba(255,150,130,.5)'); gr.addColorStop(1, 'rgba(255,120,110,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t })()
-const glows = []
-for (let i = 0; i < 28; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, opacity: 0 })); s.visible = false; scene.add(s); glows.push(s) }
-
-// 煙（蚊取り線香）とスプレーの霧
-const smokeTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(220,226,235,.55)'); gr.addColorStop(1, 'rgba(220,226,235,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); return t })()
-const smoke = []
-for (let i = 0; i < (LOW ? 36 : 60); i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, transparent: true, depthWrite: false, opacity: 0 })); s.userData = { t: Math.random() * 6, ph: Math.random() * 6 }; scene.add(s); smoke.push(s) }
-const mist = []
-for (let i = 0; i < 26; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, transparent: true, depthWrite: false, opacity: 0, color: 0xd8f0ff })); s.userData = { life: 0, v: new THREE.Vector3() }; s.visible = false; scene.add(s); mist.push(s) }
-
-// 飛んでくる手（腕＋手のひら）・うちわ・スプレー缶
-const skin = new THREE.MeshStandardMaterial({ color: 0xf0b48c, roughness: 0.8 })
-function makeArm(sleeve) {
-  const g = new THREE.Group()
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 1, 10), new THREE.MeshStandardMaterial({ color: sleeve, roughness: 0.9 })); arm.geometry.translate(0, 0.5, 0); g.add(arm)
-  const palm = new THREE.Group(); g.add(palm)
-  const p = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.035, 0.12), skin); palm.add(p)
-  for (let i = 0; i < 4; i++) { const f = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.03, 0.07), skin); f.position.set(-0.04 + i * 0.027, 0, 0.09); palm.add(f) }
-  const th = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.03, 0.055), skin); th.position.set(0.065, 0, 0.02); th.rotation.y = -0.6; palm.add(th)
-  g.visible = false; scene.add(g)
-  return { g, arm, palm }
+function buildActors() {
+  // 蚊: 体の板＋羽の板2枚。いつも見えるよう最前面に描く
+  const g = new THREE.Group(), body = new THREE.Mesh(GEO_C, cutMat('m_back', { depthTest: false })); body.renderOrder = 31
+  const wingMat = cutMat('m_wing', { depthTest: false, opacity: 0.82 })
+  const wa = SPR.m_wing.w / SPR.m_wing.h
+  const wing = dir => { const piv = new THREE.Group(), m = new THREE.Mesh(GEO_B, wingMat); m.renderOrder = 30; m.scale.set(0.21 * wa * dir, 0.21, 1); m.position.x = 0.21 * wa * dir / 2 - 0.01 * dir; piv.add(m); piv.position.set(0.05 * dir, 0.07, 0); g.add(piv); return piv }
+  const wl = wing(-1), wr = wing(1); g.add(body); scene.add(g)
+  const shadow = shadowMesh(0.3)
+  mos = { root: g, body, wl, wr, shadow }
+  setMosFrame('m_back')
+  // スプレーの円すい・網の扇
+  const cg = new THREE.ConeGeometry(1, 1, 22, 1, true); cg.translate(0, -0.5, 0); cg.rotateX(Math.PI)   // 先端が原点、+Y へ開く
+  cone = new THREE.Mesh(cg, new THREE.MeshBasicMaterial({ color: 0xbfe8c6, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide })); cone.visible = false; cone.renderOrder = 20; scene.add(cone)
+  sector = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xffb400, transparent: true, opacity: 0.32, depthWrite: false, depthTest: false, side: THREE.DoubleSide })); sector.visible = false; sector.renderOrder = 21; scene.add(sector)
+  // 振る道具
+  swatter = new THREE.Group(); const sm = new THREE.Mesh(GEO_B, cutMat('p_swatter', { depthTest: false })); const sa = SPR.p_swatter.w / SPR.p_swatter.h; sm.scale.set(1.15 * sa, 1.15, 1); sm.renderOrder = 25; swatter.add(sm); swatter.visible = false; scene.add(swatter)
+  netProp = new THREE.Mesh(GEO_C, cutMat('p_net', { depthTest: false })); const na = SPR.p_net.w / SPR.p_net.h; netProp.scale.set(1.3 * na, 1.3, 1); netProp.visible = false; netProp.renderOrder = 25; scene.add(netProp)
+  // 衝撃の星・煙の粒・入れ歯
+  for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(GEO_C, cutMat('p_burst', { depthTest: false })); m.visible = false; m.renderOrder = 26; m.userData = { t: 0 }; scene.add(m); bursts.push(m) }
+  for (let i = 0; i < 70; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.p_puff, transparent: true, depthWrite: false, opacity: 0 })); s.visible = false; s.renderOrder = 15; s.userData = { life: 0, max: 1, v: new THREE.Vector3(), grow: 1 }; scene.add(s); puffs.push(s) }
+  for (let i = 0; i < 4; i++) { const m = new THREE.Mesh(GEO_C, cutMat('p_teeth', { depthTest: false })); const a = SPR.p_teeth.w / SPR.p_teeth.h; m.scale.set(0.42 * a, 0.42, 1); m.visible = false; m.renderOrder = 24; scene.add(m); teethPool.push({ m, ring: null, alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), t: 0, homing: 0, near: false, owner: null }) }
+  // くん煙の水面
+  fog = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ color: 0xcfc3dc, transparent: true, opacity: 0.62, depthWrite: false, side: THREE.DoubleSide })); fog.rotation.x = -Math.PI / 2; fog.visible = false; fog.renderOrder = 14; scene.add(fog)
 }
-const hands = [makeArm(0x2b2f3a), makeArm(0x2b2f3a)]
-const uchiwa = (() => {
-  const g = new THREE.Group()
-  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); x.fillStyle = '#f5f0e2'; x.beginPath(); x.arc(64, 64, 62, 0, 7); x.fill(); x.fillStyle = '#2f6fa8'; for (let i = 0; i < 3; i++) { x.beginPath(); x.arc(64, 120 - i * 22, 30 + i * 12, Math.PI * 1.1, Math.PI * 1.9); x.lineWidth = 7; x.strokeStyle = '#2f6fa8'; x.stroke() } x.fillStyle = '#d6453a'; x.beginPath(); x.arc(84, 44, 14, 0, 7); x.fill()
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace
-  const face = new THREE.Mesh(new THREE.CircleGeometry(0.15, 28), new THREE.MeshStandardMaterial({ map: t, side: THREE.DoubleSide, roughness: 0.9 })); face.position.y = 0.2; g.add(face)
-  const h = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.012, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0x9a7a4a })); h.position.y = 0.04; g.add(h)
-  g.visible = false; scene.add(g); return g
-})()
-const can = (() => { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.2, 14), new THREE.MeshStandardMaterial({ color: 0xe8b62a, metalness: 0.5, roughness: 0.35 })); b.rotation.x = Math.PI / 2; g.add(b); const t = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.04, 10), new THREE.MeshStandardMaterial({ color: 0xdd3333 })); t.rotation.x = Math.PI / 2; t.position.z = -0.12; g.add(t); g.visible = false; scene.add(g); return g })()
-// 壁のシミ
-const stain = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const m = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.05), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 })); m.visible = false; scene.add(m); m.userData.c = c; return m })()
-function drawStain(red) {
-  const c = stain.userData.c, g = c.getContext('2d'); g.clearRect(0, 0, 128, 128)
-  g.fillStyle = red ? 'rgba(150,10,20,.92)' : 'rgba(40,36,34,.85)'
-  g.beginPath(); for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, r = 18 + (i % 3) * 7 + Math.random() * 8; g.lineTo(64 + Math.cos(a) * r, 64 + Math.sin(a) * r) } g.closePath(); g.fill()
-  for (let i = 0; i < 9; i++) { const a = Math.random() * 7, r = 30 + Math.random() * 26; g.beginPath(); g.arc(64 + Math.cos(a) * r, 64 + Math.sin(a) * r, 2 + Math.random() * 4, 0, 7); g.fill() }
-  g.strokeStyle = 'rgba(10,10,10,.9)'; g.lineWidth = 2; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(64, 64); const a = Math.random() * 7; g.lineTo(64 + Math.cos(a) * 26, 64 + Math.sin(a) * 26); g.stroke() }
-  stain.material.map.needsUpdate = true
-}
+function setMosFrame(n) { if (M.frame === n && mos.body.material.map === TEX[n]) return; M.frame = n; mos.body.material.map = TEX[n]; const s = SPR[n], h = n === 'm_flat' ? 0.23 : 0.3; mos.w = h * s.w / s.h; mos.h = h; mos.body.scale.set(mos.w, h, 1) }
 
-// ---------------------------------------------------------------- 1晩の組み立て（くじ）
-function clearNight() {
-  for (const p of people) { p.root.removeFromParent(); for (const z of p.zs) z.removeFromParent() }
-  people.length = 0
-  for (const f of futons) f.removeFromParent(); futons = []
-  for (const p of props) p.removeFromParent(); props = []
-  if (cat) { cat.root.removeFromParent(); cat = null }
-}
-function newNight(seed, opts = {}) {
-  clearNight()
-  const R = rng(seed)
-  const gramps = opts.gramps ?? R() < 0.35, hasCat = opts.cat ?? R() < 0.3
-  W = { seed, t: 0, R, gramps, cat: hasCat, light: 0, lightCount: 0, kidRolls: 0, kidRollT: 18 + R() * 8, events: [], bites: [], lastTalk: 0, ended: false, hintT: 0, tut: tutDone ? 99 : 0, tutT: 0, movedDist: 0, fanA: 0, restedT: 0, seenFull: false, wakes: 0 }
-  // 父（毛深い足・大の字）・たろう（ばんざい・タオルケットは蹴飛ばした）・母（腕は体の横）
-  const dad = new Sleeper(scene, 'dad', FAM.dad, -1.15, -1.45, 0, { pose: 'wide', hairy: true })
-  const kid = new Sleeper(scene, 'kid', FAM.kid, 0.02, -1.35, 0.15, { pose: 'up' })
-  const mom = new Sleeper(scene, 'mom', FAM.mom, 1.12, -1.45, 0, { pose: 'side' })
-  people.push(dad, mom, kid)
-  futons.push(futon(scene, 'dad', -1.15, -1.45, 0, 1.6, 0.9), futon(scene, 'kid', 0.0, -1.4, 0, 1.25, 0.75), futon(scene, 'mom', 1.12, -1.45, 0, 1.6, 0.9))
-  // タオルケット（父はお腹だけ・母は胸まで・たろうは足元に丸まっている）
-  const tD = towel('#d9c27a', '#efe3b2', 0.8, 0.32, 0.3); tD.position.set(-1.15, 0.09, -0.78); scene.add(tD); props.push(tD)
-  const tM = towel('#e7a3b0', '#f6dde2', 0.86, 0.62, 0.31); tM.position.set(1.12, 0.09, -0.6); scene.add(tM); props.push(tM)
-  const tK = towel('#7fb6d6', '#d6ecf6', 0.42, 0.3, 0.07); tK.position.set(0.25, 0.09, -0.05); tK.rotation.y = 0.7; scene.add(tK); props.push(tK)
-  mom.cover = []
-  if (gramps) {
-    const g = new Sleeper(scene, 'gramps', FAM.gramps, -1.55, 1.15, Math.PI / 2, { pose: 'side', bald: true })
-    people.push(g); futons.push(futon(scene, 'gramps', -1.55, 1.15, Math.PI / 2, 1.6, 0.9))
-    const tG = towel('#8a7a5a', '#c9bb98', 0.86, 0.6, 0.31); tG.position.set(-0.78, 0.09, 1.15); tG.rotation.y = Math.PI / 2; scene.add(tG); props.push(tG)
-    // 枕元の入れ歯（コップの中）
-    const cup = new THREE.Group(); cup.position.set(-1.6, 0, 0.45); scene.add(cup); props.push(cup)
-    const gl = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.035, 0.1, 16, 1, true), new THREE.MeshStandardMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.35, roughness: 0.05, side: THREE.DoubleSide })); gl.position.y = 0.05; cup.add(gl)
-    const water = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.033, 0.07, 16), new THREE.MeshStandardMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.3 })); water.position.y = 0.035; cup.add(water)
-    const gum = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.008, 6, 16, Math.PI), new THREE.MeshStandardMaterial({ color: 0xe88a96 })); gum.position.set(0, 0.04, 0); gum.rotation.x = 0.4; cup.add(gum)
-    for (let i = 0; i < 7; i++) { const a = i / 6 * Math.PI; const t = new THREE.Mesh(new THREE.BoxGeometry(0.007, 0.01, 0.006), new THREE.MeshStandardMaterial({ color: 0xfaf8f0 })); t.position.set(Math.cos(a) * 0.02, 0.05, Math.sin(a) * 0.02 * Math.cos(0.4)); cup.add(t) }
+// 人物（切り絵）
+class Person {
+  constructor(id, x, z) {
+    this.id = id; this.data = FAM[id]; this.kind = this.data.kind
+    this.ppm = SPR[id + '_walk'].h / this.data.h
+    this.mat = cutMat(id + '_walk')
+    this.mesh = new THREE.Mesh(GEO_B, this.mat); this.mesh.renderOrder = 10; scene.add(this.mesh)
+    this.shadow = shadowMesh(id === 'cat' || id === 'pig' ? 0.7 : 0.95)
+    this.pos = new THREE.Vector3(x, 0, z); this.vel = new THREE.Vector3(); this.state = 'wake'; this.t = 0; this.cd = 0.6; this.act = null; this.y = 0; this.flip = 1; this.frame = null; this.lunge = 0; this.stepT = 0; this.smokeT = 0
+    this.setFrame('walk'); this.head = new THREE.Vector3()
   }
-  room.table.visible = !gramps
-  room.tableSolid.min.y = gramps ? -10 : 0; room.tableSolid.max.y = gramps ? -9 : 0.35
-  if (hasCat) cat = new Cat(scene, 1.45, 0.35)
-  for (const p of people) { p.updateWorld() }
-  // 蚊は手前のふすまのすき間から入ってくる
-  M.pos.set(-0.2, 1.1, 1.55); M.vel.set(0, 0, 0); M.full = 0; M.total = 0; M.dizzy = 0; M.state = 'fly'; M.perch = null; M.alive = true; M.death = null; M.wind = 0
-  camYaw = 0; camPitch = -0.28
-  room.setLight(false); room.setDawn(0); stain.visible = false; mos.root.visible = true; mos.root.scale.set(1, 1, 1)
-  hands.forEach(h => h.g.visible = false); uchiwa.visible = false; can.visible = false
-  for (const m of mist) { m.visible = false; m.userData.life = 0 }
+  setFrame(f) { if (this.frame === f) return; this.frame = f; const n = `${this.id}_${f}`; this.mat.map = TEX[n]; this.w = SPR[n].w / this.ppm; this.h = SPR[n].h / this.ppm }
+  remove() { scene.remove(this.mesh, this.shadow); this.mat.dispose(); freeRing(this.act && this.act.ring) }
+}
+
+// ---------------------------------------------------------------- 1回の準備
+function clearRun() {
+  for (const p of people) p.remove(); people.length = 0
+  for (const r of rings) freeRing(r)
+  for (const b of teethPool) { b.alive = false; b.m.visible = false; freeRing(b.ring); b.ring = null }
+  for (const s of puffs) { s.userData.life = 0; s.visible = false }
+  for (const b of bursts) b.visible = false
+  columns.length = 0
+  if (cone) { cone.visible = false; sector.visible = false; swatter.visible = false; netProp.visible = false; fog.visible = false }
+}
+function newRun(seed, opts = {}) {
+  clearRun()
+  const R = rng(seed)
+  // 父が最初、次に母（叩く→スプレーの順で覚える）。あとはくじ
+  const later = R() < 0.5 ? ['kid', 'gramps'] : ['gramps', 'kid']
+  const spawns = [{ t: 0, id: 'dad' }, { t: 12, id: 'mom' }, { t: 30, id: later[0] }, { t: 50, id: later[1] }]
+  const hasCat = opts.cat ?? R() < 0.3, hasPig = opts.pig ?? R() < 0.25, hasNb = opts.neighbor ?? R() < 0.2
+  if (hasCat) spawns.push({ t: 20 + R() * 20, id: 'cat' })
+  if (hasPig) spawns.push({ t: 40 + R() * 30, id: 'pig' })
+  if (hasNb) spawns.push({ t: 65 + R() * 25, id: 'neighbor' })
+  spawns.sort((a, b) => a.t - b.t)
+  W = { seed, t: 0, R, spawns, gap: 2.4, d: 0, near: 0, ended: false, killer: null, result: null, tut: (opts.tut ?? !tutDone) ? 0 : 3, tutMoved: 0, tutV: 0, firstStrike: false, fogSaid: false, chimeT: 18, lineT: 0, lastBubble: -9 }
+  M.pos.set(0, 1.25, 1.6); M.vel.set(0, 0, 0); M.cough = 0; M.alive = true; M.death = null; M.panic = 0; deathT = 0
+  camYaw = 0; camPitch = -0.12; lastLook = -9
+  camera.position.set(0, 1.6, 3); shake = flash = hitStop = 0
+  mos.root.scale.set(1, 1, 1); mos.root.rotation.set(0, 0, 0)
+  setMosFrame('m_back')
+  stick.x = stick.y = 0; vertBtn = 0; vertPulse = 0
+}
+function spawnPerson(id) {
+  // 蚊から離れた所に出す。父は最初に正面
+  let x, z
+  if (id === 'dad' && W.t < 1) { x = 0; z = -1 }
+  else { let bestD = -1; for (let i = 0; i < 8; i++) { const a = W.R() * Math.PI * 2, xx = Math.cos(a) * 2.5, zz = Math.sin(a) * 2.5, dd = Math.hypot(xx - M.pos.x, zz - M.pos.z); if (dd > bestD) { bestD = dd; x = xx; z = zz } } }
+  const p = new Person(id, x, z); people.push(p)
+  sfx(id === 'cat' ? 'meow' : id === 'pig' ? 'squeak' : 'grunt', { vol: 0.6 })
+  line(p, 'wake', 0)
+  return p
 }
 
 // ---------------------------------------------------------------- 入力
-const keys = new Set()
 const stick = { x: 0, y: 0, id: null }
-let vertBtn = 0, vertPulse = 0, biteBuf = false
+let vertBtn = 0, vertPulse = 0
 const look = { id: null, x: 0, y: 0 }
-addEventListener('keydown', e => {
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault()
-  keys.add(e.code); audioOn()
-  if (mode === 'play' && !e.repeat && ['KeyE', 'Enter', 'KeyF'].includes(e.code)) biteBuf = true
-  if (mode === 'play' && e.code === 'Escape') setPause(!paused)
-  if (mode === 'result' && !e.repeat && (e.code === 'Enter' || e.code === 'KeyR')) start()
-})
-addEventListener('keyup', e => keys.delete(e.code))
-addEventListener('blur', () => { keys.clear(); if (mode === 'play') setPause(true) })
-// 左下に固定したスティック
-;(() => {
+addEventListener('blur', () => { if (mode === 'play') setPause(true) })
+document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'play') setPause(true) })
+;(() => {   // 左下に固定したスティック
   const zone = $('stickZone'), el = $('stick'), knob = el.querySelector('.knob')
   const upd = e => {
     const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = r.width / 2
@@ -194,37 +184,22 @@ addEventListener('blur', () => { keys.clear(); if (mode === 'play') setPause(tru
   const end = e => { if (e.pointerId !== stick.id) return; stick.id = null; stick.x = stick.y = 0; knob.style.transform = ''; el.classList.remove('held') }
   zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end)
 })()
-// 見回す（右側をなぞる。PC はどこでもドラッグ）
 const view = $('view')
 view.addEventListener('pointerdown', e => { audioOn(); if (look.id != null) return; look.id = e.pointerId; look.x = e.clientX; look.y = e.clientY; try { view.setPointerCapture(e.pointerId) } catch (er) {} })
 view.addEventListener('pointermove', e => {
   if (e.pointerId !== look.id) return
-  const k = coarse ? 0.0072 : 0.0048
-  camYaw -= (e.clientX - look.x) * k; camPitch = clamp(camPitch - (e.clientY - look.y) * k, -1.3, 1.1)
-  look.x = e.clientX; look.y = e.clientY
+  const k = 0.0072
+  camYaw -= (e.clientX - look.x) * k; camPitch = clamp(camPitch - (e.clientY - look.y) * k, -0.9, 0.7)
+  look.x = e.clientX; look.y = e.clientY; if (W) lastLook = W.t
 })
 const lookEnd = e => { if (e.pointerId === look.id) look.id = null }
 view.addEventListener('pointerup', lookEnd); view.addEventListener('pointercancel', lookEnd)
-// 上下（羽ボタン。1回押すと少し上がる・押している間は上がり続ける）
-for (const [id, d] of [['btnUp', 1], ['btnDown', -1]]) {
+for (const [id, d] of [['btnUp', 1], ['btnDown', -1]]) {   // 羽ボタン（1回押すと少し、押している間は続く）
   const b = $(id)
-  b.addEventListener('pointerdown', e => { e.preventDefault(); audioOn(); vertBtn = d; vertPulse = 0.28 * d; b.classList.add('on') })
+  b.addEventListener('pointerdown', e => { e.preventDefault(); audioOn(); vertBtn = d; vertPulse = 0.16 * d; b.classList.add('on') })
   for (const n of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(n, () => { if (vertBtn === d) vertBtn = 0; b.classList.remove('on') })
 }
-$('btnBite').addEventListener('pointerdown', e => { e.preventDefault(); audioOn(); if (mode === 'play') biteBuf = true })
-
-function gather() {
-  if (testInput) return testInput()
-  let sx = stick.x, sy = stick.y, v = vertBtn
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) sx -= 1
-  if (keys.has('KeyD') || keys.has('ArrowRight')) sx += 1
-  if (keys.has('KeyW') || keys.has('ArrowUp')) sy += 1
-  if (keys.has('KeyS') || keys.has('ArrowDown')) sy -= 1
-  if (keys.has('Space')) v = 1
-  if (keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('KeyC')) v = -1
-  const b = biteBuf; biteBuf = false
-  return { sx: clamp(sx, -1, 1), sy: clamp(sy, -1, 1), v, bite: b }
-}
+function gather() { if (testInput) return testInput(); return { sx: clamp(stick.x, -1, 1), sy: clamp(stick.y, -1, 1), v: vertBtn } }
 
 // ---------------------------------------------------------------- 画面
 function show(id) { for (const s of ['title', 'how', 'result', 'pause']) $(s).classList.toggle('hidden', s !== id) }
@@ -232,9 +207,11 @@ function applyLang() {
   document.documentElement.lang = lang
   for (const el of document.querySelectorAll('[data-t]')) { const v = T()[el.dataset.t]; if (typeof v === 'string') el.textContent = v }
   $('howList').innerHTML = T().how.map(s => `<li>${s}</li>`).join('')
-  $('howKeys').innerHTML = (coarse ? T().keysTouch : T().keysPC).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')
+  $('howWho').innerHTML = T().who.map(([id, n, w]) => `<figure><img src="img/${id}_wind.webp?v=4" alt=""><figcaption><b>${n}</b>${w}</figcaption></figure>`).join('')
+  $('howKeys').innerHTML = T().keysTouch.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')
   $('btnMute').textContent = muted ? T().soundOff : T().soundOn
-  $('biteLbl').textContent = T().lbl[$('btnBite').dataset.s] || ''
+  $('bestT').textContent = best > 0 ? `${T().best} ${fmt(best)}${T().sec}` : ''
+  $('hudBest').textContent = best > 0 ? `${T().best} ${fmt(best)}` : ''
 }
 $('btnLang').onclick = () => { lang = lang === 'ja' ? 'en' : 'ja'; try { localStorage.setItem('nm_lang', lang) } catch (e) {} applyLang() }
 $('btnMute').onclick = () => { muted = !muted; Snd.setMute(muted); try { localStorage.setItem('nm_mute', muted ? '1' : '0') } catch (e) {} applyLang() }
@@ -246,606 +223,565 @@ $('btnTitle').onclick = () => toTitle()
 $('btnPause').onclick = () => setPause(true)
 $('btnResume').onclick = () => setPause(false)
 $('btnQuit').onclick = () => { setPause(false); toTitle() }
-$('btnSave').onclick = () => { const a = document.createElement('a'); a.download = 'kayumi-report.png'; a.href = $('report').toDataURL('image/png'); a.click() }
+$('btnSave').onclick = () => { const a = document.createElement('a'); a.download = 'mosquito-wanted.png'; a.href = $('report').toDataURL('image/png'); a.click() }
 
 function setPause(on) { if (mode !== 'play') return; paused = on; $('pause').classList.toggle('hidden', !on); if (!on) { lastT = performance.now(); simAcc = 0 } }
 function toTitle() {
-  mode = 'title'; paused = false; testInput = null
-  newNight(Math.floor(Math.random() * 1e9))
-  show('title'); $('hud').classList.add('hidden'); applyLang()
-  M.pos.set(0.35, 0.95, -0.2)
+  mode = 'title'; paused = false; testInput = null; clearRun(); W = null
+  Snd.loop('bgm', null); loopVol('buzz', 0.0001)
+  show('title'); $('hud').classList.add('hidden'); say.el.classList.add('hidden'); hideEdges(); applyLang()
+  $('fxWord').classList.add('hidden')
 }
 function start(seed, opts) {
   audioOn()
-  newNight(seed ?? Math.floor(Math.random() * 1e9), opts || {})
-  mode = 'play'; paused = false; shake = flash = hitStop = 0; deathT = 0; say.t = 0; say.who = null; say.el.classList.add('hidden')
-  show(null); $('hud').classList.remove('hidden'); $('touch').classList.toggle('hidden', !coarse)
-  $('tip').classList.add('hidden')
+  if (Snd.ctx && (!Snd.loops.bgm)) Snd.loop('bgm', 'snd/bgm_chase.mp3', 0.2)
+  newRun(seed ?? Math.floor(Math.random() * 1e9), opts || {})
+  mode = 'play'; paused = false; say.t = 0; say.who = null; say.el.classList.add('hidden')
+  show(null); $('hud').classList.remove('hidden'); $('fxWord').classList.add('hidden')
+  tipKey = null; $('tip').classList.add('hidden'); applyLang()
   lastT = performance.now(); simAcc = 0
   sfx('click', { vol: 0.5 })
 }
 
-// 吹き出し（寝言など）。同時に1つ。表示時間は 0.9秒＋1字0.09秒
-function bubble(who, line, cls = '') {
-  if (say.t > 0.3) return false
-  say.who = who; say.el.textContent = line; say.el.className = 'say ' + cls; say.t = 0.9 + line.length * 0.09 + 0.6
+// 吹き出し（同時に1つ。表示は 0.9秒＋1字0.09秒）
+function bubble(who, text) {
+  if (say.t > 0.3 || W.tut < 3) return false
+  say.who = who; say.el.textContent = text; say.el.classList.remove('hidden'); say.t = 0.9 + text.length * 0.09 + 0.4; W.lastBubble = W.t
   return true
 }
-const pick = (a, n) => a[Math.floor(n) % a.length]
+const pick = a => a[Math.floor(Math.random() * a.length)]
+function line(p, kind, gap = 3.2) { if (W.t - W.lastBubble < gap) return; const l = p.data[kind][lang]; bubble(p, pick(l)) }
 let tipKey = null
-function tip(k) { if (tipKey === k) return; tipKey = k; const el = $('tip'); if (!k) { el.classList.add('hidden'); return } el.textContent = T().tut[k] || T().say[k] || k; el.classList.remove('hidden') }
+function tip(k) { if (tipKey === k) return; tipKey = k; const el = $('tip'); if (!k) { el.classList.add('hidden'); return } el.textContent = T().tut[k] || k; el.classList.remove('hidden') }
 
-// ---------------------------------------------------------------- 当たり
-const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion()
-function pushOut(p, r = 0.012) {
-  const R = ROOM
-  p.x = clamp(p.x, R.x0 + r, R.x1 - r); p.z = clamp(p.z, R.z0 + r, R.z1 - r); p.y = clamp(p.y, r + 0.002, R.h - r)
+// ---------------------------------------------------------------- 効果
+function burst(pos, size, tint) { const b = bursts.find(x => !x.visible) || bursts[0]; b.position.copy(pos); b.visible = true; b.userData.t = 0; b.userData.size = size; b.material.color.set(tint || 0xffffff); b.material.opacity = 1 }
+function puff(pos, size, life, vx, vy, vz, tint, grow = 1.6) {
+  const s = puffs.find(x => x.userData.life <= 0); if (!s) return null
+  s.position.copy(pos); s.visible = true; const u = s.userData; u.life = u.max = life; u.v.set(vx, vy, vz); u.size = size; u.grow = grow; s.material.color.set(tint || 0xffffff); s.material.opacity = 0.9; return s
+}
+function stepFx(dt) {
+  for (const s of puffs) { const u = s.userData; if (u.life <= 0) continue; u.life -= dt; if (u.life <= 0) { s.visible = false; continue } s.position.addScaledVector(u.v, dt); const k = 1 - u.life / u.max; const sc = u.size * (1 + k * u.grow); s.scale.set(sc, sc, 1); s.material.opacity = Math.min(0.9, u.life / u.max * 2) }
+  for (const b of bursts) { if (!b.visible) continue; b.userData.t += dt; const t = b.userData.t, k = Math.min(1, t / 0.08), a = SPR.p_burst.w / SPR.p_burst.h, sz = b.userData.size * k; b.scale.set(sz * a, sz, 1); b.material.opacity = t > 0.2 ? Math.max(0, 1 - (t - 0.2) / 0.15) : 1; if (t > 0.35) b.visible = false }
+}
+function nearMiss() {
+  W.near++; M.panic = 0.5; hitStop = Math.max(hitStop, 0.05)
+  const el = $('nearW'); el.textContent = T().near; el.classList.remove('hidden'); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''
+  W.nearUntil = W.t + 0.5
+  sfx('swish', { vol: 0.5 })
+}
+function kill(kind, who) {
+  if (!M.alive) return
+  M.alive = false; M.death = kind; W.killer = who ? who.id : null; W.deathAt = M.pos.clone(); W.deathVel = M.vel.clone(); deathT = 0
+  hitStop = 0.14; flash = 1; shake = 1
+  if (kind === 'zap') sfx('zap', { vol: 1 }); else if (kind === 'spray' || kind === 'smoke' || kind === 'fog') sfx('grunt', { vol: 0.8, rate: 1.6 }); else sfx('slap', { vol: 1 })
+  sfx('squish', { vol: 0.7 }); Snd.duck && Snd.duck(0.35, 1.4)
+  burst(M.pos, kind === 'spray' || kind === 'fog' || kind === 'smoke' ? 0.5 : 0.95, kind === 'zap' ? 0x9fe7ff : 0xffffff)
+  setMosFrame(kind === 'spray' || kind === 'fog' || kind === 'smoke' ? 'm_cough' : 'm_flat')
+  const el = $('fxWord'); el.textContent = T().death[kind]; el.classList.remove('hidden')
+  say.t = 0; say.el.classList.add('hidden')
+  if (who) setTimeoutWin(who)
+  if (W.tut < 3) { W.tut = 3; tutDone = true; try { localStorage.setItem('nm_tut2', '1') } catch (e) {} }
+  tip(null)
+}
+function setTimeoutWin(who) { W.winLine = pick(who.data.win[lang]); W.winWho = who; W.winAt = 0.75 }
+
+// ---------------------------------------------------------------- 攻撃
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3()
+const dOf = () => Math.min(1, W.d)
+function predict(out, lead) { const k = dOf() * 0.85; out.copy(M.pos).addScaledVector(M.vel, lead * k); out.x = clamp(out.x, ROOM.x0 + 0.1, ROOM.x1 - 0.1); out.z = clamp(out.z, ROOM.z0 + 0.1, ROOM.z1 - 0.1); out.y = clamp(out.y, 0.12, ROOM.h - 0.08); return out }
+const RANGE = { swat: 1.35, zap: 1.4, net: 1.3, spray: 2.3, teeth: 4.4, leap: 2.6, smoke: 99 }
+const PREFER = { swat: 1.1, zap: 1.15, net: 1.1, spray: 1.9, teeth: 3.1, leap: 1.9, smoke: 0 }
+const WIND = { swat: [0.95, 0.6], zap: [1.05, 0.7], net: [1.05, 0.72], spray: [0.95, 0.6], teeth: [0.8, 0.5], leap: [0.85, 0.58] }
+function startAct(p) {
+  const d = dOf(), wt = WIND[p.kind], a = { kind: p.kind, t: 0, w: lerp(wt[0], wt[1], d), locked: false, aim: new THREE.Vector3(), dir: new THREE.Vector3(), phase: 'wind', ring: null, r: p.kind === 'zap' ? 0.5 : p.kind === 'leap' ? 0.34 : 0.38 }
+  p.act = a; p.state = 'act'; p.setFrame('wind'); p.vel.set(0, 0, 0)
+  W.gap = lerp(2.0, 0.5, d)
+  if (p.kind === 'swat' || p.kind === 'zap' || p.kind === 'leap') { a.ring = getRing(); predict(a.aim, 0.38) }
+  if (p.kind === 'spray') { sfx('shake', { vol: 0.7 }); cone.visible = true; cone.material.opacity = 0.12; cone.material.color.set(0xffd27a); a.dir.copy(_v.copy(M.pos).sub(mouth(p, _v2))).normalize(); placeCone(p, a, 0.12) }
+  if (p.kind === 'net') { a.dir.copy(_v.copy(M.pos).sub(p.pos)).setY(0).normalize(); a.h = M.pos.y; buildSector(p, a); sector.visible = true; sector.material.color.set(0xffb400) }
+  if (p.kind === 'zap') sfx('zap', { vol: 0.4 })
+  if (p.kind === 'leap') sfx('meow', { vol: 0.5 })
+  line(p, 'hit')
+}
+function mouth(p, out) { return out.set(p.pos.x, p.pos.y + p.data.h * 0.68, p.pos.z) }
+const SPRAY = { L: 2.7, half: 0.25 }
+function placeCone(p, a, op) { const o = mouth(p, _v3); cone.position.copy(o); cone.quaternion.setFromUnitVectors(_v.set(0, 1, 0), a.dir); const r = SPRAY.L * Math.tan(SPRAY.half); cone.scale.set(r, SPRAY.L, r); cone.material.opacity = op }
+const NET = { r0: 0.2, r1: 1.75, half: 1.15, dy: 0.38 }
+function buildSector(p, a) {
+  const pts = [], idx = [], N = 18, base = Math.atan2(a.dir.x, a.dir.z)
+  for (let i = 0; i <= N; i++) { const t = base + (i / N - 0.5) * 2 * NET.half; for (const r of [NET.r0, NET.r1]) pts.push(Math.sin(t) * r, 0, Math.cos(t) * r); if (i < N) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2) } }
+  const g = sector.geometry; g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); g.setIndex(idx); g.computeBoundingSphere()
+  sector.position.set(p.pos.x, a.h, p.pos.z)
+}
+function endAct(p) {
+  const a = p.act; if (a) { freeRing(a.ring); a.ring = null; if (a.kind === 'spray') cone.visible = false; if (a.kind === 'net') { sector.visible = false; netProp.visible = false } }
+  p.act = null; p.state = 'chase'; p.setFrame('walk'); p.cd = lerp(1.7, 0.55, dOf()); p.y = 0; p.lunge = 0
+}
+function stepAct(p, dt) {
+  const a = p.act; a.t += dt
+  if (a.phase === 'wind') {
+    const left = a.w - a.t, k = clamp(a.t / a.w, 0, 1)
+    if (a.kind === 'swat' || a.kind === 'zap') {
+      const lockAt = 0.38
+      if (left > lockAt) predict(a.aim, lockAt)
+      else if (!a.locked) { a.locked = true }
+      // 届く範囲に収める
+      _v.copy(a.aim).sub(p.pos).setY(0); const dd = _v.length(); if (dd > 1.55) a.aim.addScaledVector(_v, (1.55 - dd) / dd)
+      placeRing(a.ring, a.aim, a.r, k, a.locked)
+      if (left <= 0) strike(p, a)
+    } else if (a.kind === 'leap') {
+      const lockAt = 0.34
+      if (left > lockAt) predict(a.aim, lockAt); else a.locked = true
+      placeRing(a.ring, a.aim, a.r, k, a.locked); p.mesh.rotation.z = 0
+      if (left <= 0) { a.phase = 'air'; a.t = 0; a.from = p.pos.clone(); a.dur = 0.5; p.setFrame('hit'); sfx('swish', { vol: 0.8 }) }
+    } else if (a.kind === 'spray') {
+      const lockAt = 0.34
+      if (left > lockAt) a.dir.copy(predict(_v, lockAt).sub(mouth(p, _v2))).normalize(); else a.locked = true
+      cone.material.color.set(a.locked ? 0xff9a6a : 0xffd27a); placeCone(p, a, 0.1 + k * 0.14)
+      if (Math.floor(a.t * 8) !== Math.floor((a.t - dt) * 8)) p.lunge = (p.lunge ? 0 : 0.03)
+      if (left <= 0) { a.phase = 'fire'; a.t = 0; a.dur = lerp(1.1, 1.7, dOf()); p.setFrame('hit'); p.lunge = 0; sfx('spray', { vol: 0.9 }); cone.material.color.set(0xbfe8c6) }
+    } else if (a.kind === 'net') {
+      const lockAt = 0.36
+      if (left > lockAt) { a.dir.copy(_v.copy(M.pos).sub(p.pos)).setY(0).normalize(); a.h = M.pos.y; buildSector(p, a) } else a.locked = true
+      sector.material.color.set(a.locked ? 0xff2412 : 0xffb400)
+      if (left <= 0) { a.phase = 'sweep'; a.t = 0; a.dur = 0.3; a.prevAng = -NET.half; p.setFrame('hit'); netProp.visible = true; sfx('swish', { vol: 0.9 }) }
+    } else if (a.kind === 'teeth') {
+      if (left <= 0) { throwTeeth(p); a.phase = 'after'; a.t = 0; a.dur = 0.4; p.setFrame('hit') }
+    }
+    return
+  }
+  if (a.phase === 'after') { if (a.t >= a.dur) endAct(p); return }
+  if (a.phase === 'air') {   // 猫: 弧を描いて飛ぶ
+    const k = clamp(a.t / a.dur, 0, 1)
+    p.pos.x = lerp(a.from.x, a.aim.x, k); p.pos.z = lerp(a.from.z, a.aim.z, k)
+    p.y = Math.max(0, a.aim.y * k + Math.sin(k * Math.PI) * 0.4 - p.data.h * 0.5 * k)
+    placeRing(a.ring, a.aim, a.r, 1, true)
+    if (k > 0.55 && M.alive) { const cy = p.y + p.data.h * 0.5; if (Math.hypot(M.pos.x - p.pos.x, M.pos.z - p.pos.z) < a.r + M_R && Math.abs(M.pos.y - cy) < 0.42) kill('cat', p) }
+    if (k >= 1) { freeRing(a.ring); a.ring = null; burst(_v.copy(a.aim), 0.45); a.phase = 'fall'; a.t = 0; a.y0 = p.y; sfx('slap', { vol: 0.5 }); if (M.alive && a.aim.distanceTo(M.pos) < a.r + 0.5) nearMiss() }
+    return
+  }
+  if (a.phase === 'fall') { p.y = Math.max(0, a.y0 - 4.9 * a.t * a.t); if (p.y === 0) { if (!a.lg) { a.lg = true; a.lt = a.t; sfx('thud', { vol: 0.35 }) } if (a.t - a.lt > 0.45) endAct(p) } return }
+  if (a.phase === 'fire') {  // スプレー: 霧の中に長くいるとむせて落ちる
+    const turn = lerp(0.18, 0.55, dOf()) * dt
+    _v.copy(M.pos).sub(mouth(p, _v2)).normalize(); a.dir.lerp(_v, turn).normalize()
+    placeCone(p, a, 0.26)
+    const o = mouth(p, _v2)
+    if (Math.floor(a.t * 30) !== Math.floor((a.t - dt) * 30)) { const sp = 2.1 + Math.random() * 0.6; const ss = sp * Math.tan(SPRAY.half) * 0.55; puff(o.clone().addScaledVector(a.dir, 0.15), 0.12, 0.85, a.dir.x * sp + (Math.random() - .5) * ss, a.dir.y * sp + (Math.random() - .5) * ss, a.dir.z * sp + (Math.random() - .5) * ss, 0xc9f0d0, 3.4) }
+    if (inCone(M.pos, o, a.dir)) { W.inMist = true; a.touched = true } else if (a.touched && !a.nearDone) { a.nearDone = true; nearMiss() }
+    if (a.t >= a.dur) endAct(p)
+    return
+  }
+  if (a.phase === 'sweep') { // 網: 端から端へ扇を掃く
+    const k = clamp(a.t / a.dur, 0, 1), ang = lerp(-NET.half, NET.half, k), base = Math.atan2(a.dir.x, a.dir.z)
+    netProp.position.set(p.pos.x + Math.sin(base + ang) * 1.15, a.h, p.pos.z + Math.cos(base + ang) * 1.15)
+    netProp.quaternion.copy(camera.quaternion); netProp.rotateZ(-ang * 0.7)
+    _v.copy(M.pos).sub(p.pos); const dy = M.pos.y - a.h; const hd = Math.hypot(_v.x, _v.z), mAng = wrap(Math.atan2(_v.x, _v.z) - base)
+    if (M.alive && hd > NET.r0 - M_R && hd < NET.r1 + M_R && Math.abs(dy) < NET.dy && mAng >= a.prevAng - 0.08 && mAng <= ang + 0.08) kill('net', p)
+    a.prevAng = ang
+    if (k >= 1) { if (M.alive && hd < NET.r1 + 0.45 && Math.abs(dy) < NET.dy + 0.4 && Math.abs(mAng) < NET.half + 0.3) nearMiss(); a.phase = 'after'; a.t = 0; a.dur = 0.28; sector.visible = false; netProp.visible = false }
+    return
+  }
+  if (a.phase === 'strike') { // 叩いた直後の余韻
+    const k = clamp(a.t / 0.16, 0, 1), side = a.side
+    swatter.quaternion.copy(camera.quaternion); swatter.position.copy(a.aim).addScaledVector(_v.set(0, 1, 0).applyQuaternion(camera.quaternion), 0.97); swatter.rotateZ(Math.PI + side * (1 - k) * 1.5)
+    swatter.visible = a.kind === 'swat' && a.t < 0.17
+    if (a.t > 0.34) { swatter.visible = false; p.lunge = Math.max(0, p.lunge - dt * 2) }
+    if (a.t > 0.5) endAct(p)
+  }
+}
+function strike(p, a) {
+  a.phase = 'strike'; a.t = 0; a.side = Math.random() < 0.5 ? 1 : -1
+  freeRing(a.ring); a.ring = null
+  p.setFrame('hit'); p.lunge = 0.25; W.firstStrike = true
+  // 高い所へは跳ねて届かせる（天井も安全地帯にしない）
+  p.y = Math.max(0, a.aim.y - p.data.h - 0.1)
+  sfx(a.kind === 'zap' ? 'zap' : 'thwack', { vol: 0.9 })
+  burst(_v.copy(a.aim), a.kind === 'zap' ? 0.72 : 0.5, a.kind === 'zap' ? 0x9fe7ff : 0xffffff)
+  const dist = M.pos.distanceTo(a.aim)
+  if (dist < a.r + M_R) kill(a.kind, p)
+  else if (dist < a.r + 0.5) nearMiss()
+  shake = Math.max(shake, 0.25)
+}
+function wrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a }
+function inCone(pt, o, dir) { const dx = pt.x - o.x, dy = pt.y - o.y, dz = pt.z - o.z, al = dx * dir.x + dy * dir.y + dz * dir.z; if (al < 0.05 || al > SPRAY.L) return false; const rr = Math.hypot(dx - dir.x * al, dy - dir.y * al, dz - dir.z * al); return rr < al * Math.tan(SPRAY.half) + M_R * 0.5 }
+function throwTeeth(p) {
+  const d = dOf(), n = d > 0.6 ? 2 : 1, sp = lerp(3.1, 4.5, d)
+  for (let i = 0; i < n; i++) {
+    const b = teethPool.find(x => !x.alive); if (!b) break
+    const o = mouth(p, _v2); b.pos.copy(o); b.alive = true; b.t = 0; b.near = false; b.owner = p; b.homing = i === 0 ? 1.1 : 0; b.ring = getRing(); b.m.visible = true; b.lastPop = 0
+    _v.copy(predict(_v3, 0.5)).sub(o).normalize(); if (i === 1) _v.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.4)
+    b.vel.copy(_v).multiplyScalar(sp)
+  }
+  sfx('pop', { vol: 0.8 })
+}
+function stepTeeth(dt) {
+  for (const b of teethPool) {
+    if (!b.alive) continue
+    b.t += dt
+    if (b.t < b.homing) { const sp = b.vel.length(); _v.copy(M.pos).sub(b.pos).normalize().multiplyScalar(sp); b.vel.lerp(_v, 0.95 * dt).setLength(sp) }
+    b.pos.addScaledVector(b.vel, dt)
+    if (b.pos.x < ROOM.x0 + .1 || b.pos.x > ROOM.x1 - .1) b.vel.x *= -1
+    if (b.pos.z < ROOM.z0 + .1 || b.pos.z > ROOM.z1 - .1) b.vel.z *= -1
+    if (b.pos.y < 0.08 || b.pos.y > ROOM.h - 0.1) b.vel.y *= -1
+    b.pos.x = clamp(b.pos.x, ROOM.x0 + .1, ROOM.x1 - .1); b.pos.z = clamp(b.pos.z, ROOM.z0 + .1, ROOM.z1 - .1); b.pos.y = clamp(b.pos.y, 0.08, ROOM.h - 0.1)
+    b.m.position.copy(b.pos); placeRing(b.ring, b.pos, 0.2, 1, true); b.ring.f.visible = false
+    if (b.t - b.lastPop > 0.28) { b.lastPop = b.t; sfx('pop', { vol: 0.35, rate: 1.5 }) }
+    const dist = b.pos.distanceTo(M.pos)
+    if (M.alive && dist < 0.17 + M_R) { kill('teeth', b.owner); burst(b.pos, 0.6); b.t = 99 }
+    else if (M.alive && dist < 0.55 && !b.near) { b.near = true; b.wasNear = true }
+    else if (b.near && dist > 0.75) { b.near = false; if (b.wasNear) { b.wasNear = false; nearMiss() } }
+    if (b.t > 2.3) { b.alive = false; b.m.visible = false; freeRing(b.ring); b.ring = null; puff(b.pos, 0.2, 0.3, 0, 0, 0) }
+  }
+}
+function stepPig(p, dt) {
+  p.smokeT -= dt
+  if (p.smokeT <= 0 && columns.length < 7) {
+    p.smokeT = lerp(1.5, 0.95, dOf()); p.setFrame('hit'); p.backT = 0.4
+    columns.push({ x: p.pos.x, z: p.pos.z, life: 5.5, r: 0.36, h: 1.75, emit: 0, owner: p })
+    sfx('squeak', { vol: 0.3, rate: 0.7 }); line(p, 'hit', 7)
+  }
+  if (p.backT > 0) { p.backT -= dt; if (p.backT <= 0) p.setFrame('walk') }
+}
+function stepColumns(dt) {
+  for (let i = columns.length - 1; i >= 0; i--) {
+    const c = columns[i]; c.life -= dt; c.emit -= dt
+    if (c.emit <= 0 && c.life > 0.6) { c.emit = 0.17; for (let k = 0; k < 2; k++) puff(_v.set(c.x + (Math.random() - .5) * 0.4, Math.random() * 0.4 + 0.05, c.z + (Math.random() - .5) * 0.4), 0.28, 1.5, (Math.random() - .5) * 0.1, 1.05, (Math.random() - .5) * 0.1, 0xe2dcea, 1.5) }
+    if (c.life > 0.3 && Math.hypot(M.pos.x - c.x, M.pos.z - c.z) < c.r + M_R && M.pos.y < c.h) { W.inMist = true; W.mistBy = c.owner; W.mistKind = 'smoke' }
+    if (c.life <= 0) columns.splice(i, 1)
+  }
+}
+
+// ---------------------------------------------------------------- 1ステップ
+function stepPerson(p, dt) {
+  p.t += dt
+  if (p.state === 'wake') { p.wiggle = Math.sin(p.t * 22) * 0.04; if (p.t > 0.8) { p.state = 'chase'; p.wiggle = 0 } return }
+  if (p.state === 'act') { stepAct(p, dt); if (p.state === 'act') return }
+  // 追う
+  if (p.kind === 'smoke') stepPig(p, dt)
+  p.cd -= dt
+  _v.copy(M.pos).sub(p.pos); _v.y = 0; const dist = _v.length() || 0.001; _v.multiplyScalar(1 / dist)
+  const spd = p.data.speed * (1 + Math.min(1.25, W.d) * 0.62), pref = PREFER[p.kind]
+  let dv = dist > pref + 0.12 ? 1 : dist < pref - 0.35 ? -0.7 : 0
+  p.vel.x = lerp(p.vel.x, _v.x * spd * dv, Math.min(1, dt * 7)); p.vel.z = lerp(p.vel.z, _v.z * spd * dv, Math.min(1, dt * 7))
+  // ぶつからない
+  for (const o of people) { if (o === p || o.state === 'act' && o.kind === 'leap') continue; const dx = p.pos.x - o.pos.x, dz = p.pos.z - o.pos.z, dd = Math.hypot(dx, dz); if (dd < 0.6 && dd > 0.001) { p.vel.x += dx / dd * 1.6 * dt * 6; p.vel.z += dz / dd * 1.6 * dt * 6 } }
+  p.pos.addScaledVector(p.vel, dt)
+  p.pos.x = clamp(p.pos.x, ROOM.x0 + 0.35, ROOM.x1 - 0.35); p.pos.z = clamp(p.pos.z, ROOM.z0 + 0.35, ROOM.z1 - 0.35)
+  const sp = Math.hypot(p.vel.x, p.vel.z)
+  if (sp > 0.25) { p.stepT -= dt; if (p.stepT <= 0) { p.stepT = 0.42 / (spd / 1.2); if (dist < 3.5) sfx('cloth', { vol: 0.14 * (1 - dist / 4), rate: 0.7 }) } }
+  // 攻撃を始める。一度に始められるのは間隔が空いた時だけ（理不尽に重ねない）
+  if (p.kind !== 'smoke' && p.cd <= 0 && W.gap <= 0 && dist <= RANGE[p.kind] && (W.tut >= 2 || W.t > 9)) {
+    if (p.kind === 'net' && sector.visible) return
+    if (p.kind === 'spray' && cone.visible) return
+    startAct(p)
+  }
+}
+function stepTut() {
+  if (W.tut >= 3) return
+  if (W.tut === 0) { tip('move'); if (W.tutMoved > 1.2) W.tut = 1 }
+  else if (W.tut === 1) { tip('wing'); if (W.tutV > 0.3 || W.t > 8) W.tut = 2 }
+  else if (W.tut === 2) { tip('dodge'); if (W.firstStrike) { W.tut = 3; tip(null); tutDone = true; try { localStorage.setItem('nm_tut2', '1') } catch (e) {} } }
+}
+function stepOnce() {
+  if (!W || mode !== 'play' || paused) return
+  const dt = STEP
+  if (!M.alive) {
+    deathT += dt
+    for (const p of people) if (p.state === 'act') { stepAct(p, dt) }
+    if (W.winAt > 0) { W.winAt -= dt; if (W.winAt <= 0 && W.winWho) { say.t = 0; bubble(W.winWho, W.winLine) } }
+    if (say.t > 0) { say.t -= dt; if (say.t <= 0) say.el.classList.add('hidden') }
+    stepFx(dt)
+    if (deathT > 1.9 && !W.ended) endRun()
+    return
+  }
+  W.t += dt; W.d = W.t / 100; W.gap -= dt
+  // 登場
+  while (W.spawns.length && W.t >= W.spawns[0].t) spawnPerson(W.spawns.shift().id)
+  // 蚊
+  const inp = gather()
+  const fwdx = -Math.sin(camYaw), fwdz = -Math.cos(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw)
+  const lift = Math.abs(camPitch) > 0.32 ? Math.sin(camPitch) : 0   // はっきり上下を向いている時だけカメラの向きへ上下する
+  const max = 2.35 * (M.cough > 0.25 ? 0.78 : 1)
+  const tx = (fwdx * inp.sy + rx * inp.sx) * max, tz = (fwdz * inp.sy + rz * inp.sx) * max
+  let ty = inp.sy * lift * max + inp.v * 1.75
+  if (vertPulse) { ty += Math.sign(vertPulse) * 1.75; vertPulse = Math.abs(vertPulse) < dt ? 0 : vertPulse - Math.sign(vertPulse) * dt }
+  const rate = Math.min(1, dt * 12)
+  M.vel.x = lerp(M.vel.x, tx, rate); M.vel.y = lerp(M.vel.y, ty, rate); M.vel.z = lerp(M.vel.z, tz, rate)
+  M.pos.addScaledVector(M.vel, dt)
+  W.tutMoved += Math.hypot(M.vel.x, M.vel.z) * dt; if (Math.abs(inp.v) > 0 || vertPulse) W.tutV += dt
+  pushOut(M.pos)
+  if (M.panic > 0) M.panic -= dt
+  // 自動で振り向く: 攻撃中の人＞いちばん近い人を画面に入れておく（なぞった直後は触らない）
+  if (!noAuto && look.id == null && W.t - lastLook > 1.3 && people.length) {
+    let tg = null, bd = 1e9
+    for (const p of people) { const dd = Math.hypot(p.pos.x - M.pos.x, p.pos.z - M.pos.z) - (p.state === 'act' && p.act && p.act.phase === 'wind' ? 2.5 : 0); if (dd < bd) { bd = dd; tg = p } }
+    if (tg) { const want = Math.atan2(-(tg.pos.x - M.pos.x), -(tg.pos.z - M.pos.z)), diff = wrap(want - camYaw); if (Math.abs(diff) > 0.14) camYaw += Math.sign(diff) * Math.min(Math.abs(diff), 1.5 * dt * Math.min(1, Math.abs(diff) * 2)) }
+  }
+  // 家族
+  W.inMist = false; W.mistBy = null; W.mistKind = null
+  for (const p of people) stepPerson(p, dt)
+  stepTeeth(dt); stepColumns(dt)
+  // くん煙
+  W.fogY = W.t > FOG_T ? (W.t - FOG_T) / FOG_DUR * ROOM.h : 0
+  if (W.t > FOG_T && !W.fogSaid) { W.fogSaid = true; const mom = people.find(p => p.id === 'mom'); say.t = 0; if (mom) bubble(mom, T().fogWarn); sfx('spray', { vol: 1, rate: 0.6 }) }
+  let inFog = false
+  if (W.fogY > 0) { fog.visible = true; fog.position.y = W.fogY; inFog = M.pos.y < W.fogY; if (Math.random() < 0.5) puff(_v.set((Math.random() - .5) * 5.6, W.fogY, (Math.random() - .5) * 5.6), 0.5, 1.4, 0, 0.12, 0, 0xddd2e6, 0.8) }
+  // むせる
+  if (W.inMist || inFog) M.cough += dt * (inFog ? 1.0 : 2.1); else M.cough = Math.max(0, M.cough - dt * 0.75)
+  if (M.cough >= 1 && M.alive) {
+    const sprayer = people.find(p => p.kind === 'spray')
+    if (inFog) kill('fog', sprayer); else if (W.mistKind === 'smoke') kill('smoke', W.mistBy); else kill('spray', sprayer)
+  }
+  stepTut(); stepFx(dt)
+  if (say.t > 0) { say.t -= dt; if (say.t <= 0) say.el.classList.add('hidden') }
+  W.chimeT -= dt; if (W.chimeT <= 0) { W.chimeT = 26 + W.R() * 20; sfx('chime', { vol: 0.14 }) }
+}
+function pushOut(p) {
+  const R = ROOM, r = 0.1
+  p.x = clamp(p.x, R.x0 + r, R.x1 - r); p.z = clamp(p.z, R.z0 + r, R.z1 - r); p.y = clamp(p.y, 0.12, R.h - 0.1)
   for (const b of room.solids) {
     if (p.x < b.min.x - r || p.x > b.max.x + r || p.y < b.min.y - r || p.y > b.max.y + r || p.z < b.min.z - r || p.z > b.max.z + r) continue
     const d = [p.x - (b.min.x - r), (b.max.x + r) - p.x, p.y - (b.min.y - r), (b.max.y + r) - p.y, p.z - (b.min.z - r), (b.max.z + r) - p.z]
     let i = 0; for (let k = 1; k < 6; k++) if (d[k] < d[i]) i = k
     if (i === 0) p.x = b.min.x - r; else if (i === 1) p.x = b.max.x + r; else if (i === 2) p.y = b.min.y - r; else if (i === 3) p.y = b.max.y + r; else if (i === 4) p.z = b.min.z - r; else p.z = b.max.z + r
   }
-  for (const pp of people) for (const c of pp.cols) {
-    const d = p.distanceTo(c.w), rr = c.r + r
-    if (d < rr && d > 1e-5) p.sub(c.w).multiplyScalar(rr / d).add(c.w)
-  }
-  // 布団の上面
-  for (const f of futons) { const lp = f.worldToLocal(_v2.copy(p)); if (Math.abs(lp.x) < 0.5 && lp.z > -0.2 && lp.z < 1.8 && lp.y < 0.09 + r) { lp.y = 0.09 + r; p.copy(f.localToWorld(lp)) } }
-}
-// 近くの面（とまれる所）
-function nearestSurface(p) {
-  const R = ROOM, cands = [
-    [p.x - R.x0, 1, 0, 0], [R.x1 - p.x, -1, 0, 0], [p.z - R.z0, 0, 0, 1], [R.z1 - p.z, 0, 0, -1], [R.h - p.y, 0, -1, 0], [p.y, 0, 1, 0],
-  ]
-  for (const b of room.solids) {
-    if (p.x > b.min.x - 0.1 && p.x < b.max.x + 0.1 && p.z > b.min.z - 0.1 && p.z < b.max.z + 0.1 && p.y > b.max.y - 0.02 && p.y < b.max.y + 0.12) cands.push([p.y - b.max.y, 0, 1, 0])
-  }
-  let best = null; for (const c of cands) if (c[0] < 0.1 && (!best || c[0] < best[0])) best = c
-  if (!best) return null
-  const n = new THREE.Vector3(best[1], best[2], best[3])
-  return { n, p: p.clone().addScaledVector(n, -best[0] + 0.006) }
-}
-function nearestSpot(p, maxD) {
-  let best = null, bd = maxD
-  for (const pp of people) { if (pp.state !== 'sleep') continue; for (const s of pp.spots) { if (!s.ok) continue; const d = p.distanceTo(s.w); if (d < bd) { bd = d; best = s } } }
-  return best
 }
 
-// ---------------------------------------------------------------- 1歩（固定60Hz）
-function fanDir(out) { const a = room.fan.root.rotation.y + room.fan.neck.rotation.y; return out.set(Math.sin(a), 0, Math.cos(a)) }
-function stepOnce() {
-  if (!W || mode !== 'play' || paused) return
-  const dt = STEP
-  if (!M.alive) { deathT += dt; if (deathT > 2.2 && !W.ended) endNight(); return }
-  W.t += dt
-  const inp = gather()
-  // 扇風機の首振り（左右 0.75rad・9秒で1往復）
-  W.fanA += dt; room.fan.root.rotation.y = -2.45; room.fan.neck.rotation.y = Math.sin(W.fanA * Math.PI * 2 / 9) * 0.75
-  // 電気
-  if (W.light > 0) { W.light -= dt; if (W.light <= 0) { room.setLight(false); sfx('switch', { vol: 0.5 }) } }
-  // 夜明け（4:20 から）
-  const dawnK = smooth(NIGHT - 22, NIGHT, W.t); room.setDawn(dawnK)
-  if (W.t > NIGHT - 12 && !W.birds) { W.birds = true; sfx('birds', { vol: 0.5, jitter: 0 }) }
-  W.chimeT = (W.chimeT ?? 12) - dt; if (W.chimeT <= 0) { W.chimeT = 26 + W.R() * 20; sfx('chime', { vol: 0.18, dest: 'muf' }) }   // 窓の外の風鈴
-
-  // ---- 家族
-  for (const p of people) stepPerson(p, dt)
-  if (cat) stepCat(dt)
-  for (const p of people) p.updateWorld()
-
-  // ---- 蚊
-  const fwd = _v.set(-Math.sin(camYaw) * Math.cos(camPitch), Math.sin(camPitch), -Math.cos(camYaw) * Math.cos(camPitch))
-  const right = _v2.set(Math.cos(camYaw), 0, -Math.sin(camYaw))
-  const heavy = 1 - M.full * 0.55
-  const maxSpd = 0.95 * heavy * (M.dizzy > 0.3 ? 0.7 : 1)
-  glowTarget = null; nearSurface = null
-  if (M.state === 'fly') {
-    const tx = fwd.x * inp.sy + right.x * inp.sx, ty = fwd.y * inp.sy, tz = fwd.z * inp.sy + right.z * inp.sx
-    let vy = ty * maxSpd + inp.v * maxSpd * 0.85
-    if (vertPulse) { vy += Math.sign(vertPulse) * maxSpd * 0.85; vertPulse -= Math.sign(vertPulse) * dt; if (Math.abs(vertPulse) < dt) vertPulse = 0 }
-    const k = Math.min(1, dt * 6)
-    M.vel.x += (tx * maxSpd - M.vel.x) * k; M.vel.z += (tz * maxSpd - M.vel.z) * k; M.vel.y += (vy - M.vel.y) * k
-    M.vel.y -= M.full * 0.05 * dt   // 重いと少しずつ沈む
-    // ふらふら（煙）
-    if (M.dizzy > 0.2) { M.vel.x += Math.sin(W.t * 7.1) * M.dizzy * 0.02; M.vel.y += Math.sin(W.t * 5.3) * M.dizzy * 0.02; M.vel.z += Math.cos(W.t * 6.7) * M.dizzy * 0.02 }
-    // 扇風機の風
-    const fp = room.fan.neck.getWorldPosition(new THREE.Vector3()), fd = fanDir(new THREE.Vector3())
-    const rel = M.pos.clone().sub(fp), along = rel.dot(fd), dist = rel.length()
-    let windK = 0
-    if (along > 0 && dist < 2.6) { const off = rel.clone().addScaledVector(fd, -along).length(); windK = clamp(1 - off / (0.18 + along * 0.32), 0, 1) * (1 - dist / 2.6) }
-    M.wind = lerp(M.wind, windK, 0.1)
-    M.pos.addScaledVector(M.vel, dt).addScaledVector(fd, windK * 2.2 * dt)
-    if (windK > 0.35 && !W.windSaid) { W.windSaid = true; bubble('me', T().say.wind) }
-    if (windK < 0.05) W.windSaid = false
-    pushOut(M.pos)
-    W.movedDist += M.vel.length() * dt
-    // 刺せる場所・とまれる面
-    glowTarget = nearestSpot(M.pos, 0.14)
-    if (!glowTarget) nearSurface = nearestSurface(M.pos)
-    if (inp.bite) {
-      if (glowTarget) { M.state = 'land'; M.perch = glowTarget; M.land = 0; M.landFrom.copy(M.pos); sfx('pop', { vol: 0.25 }) }
-      else if (nearSurface) { M.state = 'rest'; M.perch = nearSurface; M.land = 0; M.landFrom.copy(M.pos) }
-    }
-  } else if (M.state === 'land' || M.state === 'suck') {
-    const s = M.perch
-    if (!s.ok || s.owner.state !== 'sleep') { takeOff(true) }
-    else {
-      M.land = Math.min(1, M.land + dt / 0.3)
-      const target = s.w.clone().addScaledVector(s.wn, 0.006)
-      M.pos.lerpVectors(M.landFrom, target, smooth(0, 1, M.land)); M.vel.set(0, 0, 0)
-      if (M.land >= 1 && M.state === 'land') {
-        if (s.hairy) { bubble('me', T().say.hairy); s.owner.alert += 0.12 * s.owner.sens; takeOff(); M.vel.set(0, 0.25, 0) }
-        else { M.state = 'suck'; M.suckT = 0; M.counted = false }
-      }
-      if (M.state === 'suck') {
-        M.suckT += dt
-        if (M.full >= 1) { if (!W.fullSaid) { W.fullSaid = true; bubble('me', T().say.full) } }
-        else if (s.stock <= 0) { if (!s.drySaid) { s.drySaid = true; bubble('me', T().say.dry) } }
-        else {
-          const d = Math.min(0.11 * dt, s.stock, 1 - M.full); M.full += d; M.total += d; s.stock -= d
-          if (Math.random() < dt * 1.4) sfx('suck', { vol: 0.12 })
-        }
-        if (!M.counted && M.suckT > 0.45) { M.counted = true; W.bites.push({ who: s.owner.id, key: s.key }); s.owner.bites.push(s.key) }
-        s.owner.alert += s.owner.sens * (s.face ? 0.05 : 0.022) * dt * (W.light > 0 ? 1.6 : 1)
-      }
-      if (inp.bite) takeOff()
-    }
-  } else if (M.state === 'rest') {
-    M.land = Math.min(1, M.land + dt / 0.3)
-    M.pos.lerpVectors(M.landFrom, M.perch.p, smooth(0, 1, M.land)); M.vel.set(0, 0, 0)
-    M.full = Math.max(0, M.full - 0.06 * dt)
-    W.restedT += dt
-    // 電気がついている時に壁にとまっていると見つかる
-    if (W.light > 0) { M.seenT = (M.seenT || 0) + dt; const mom = people.find(p => p.id === 'mom'); if (M.seenT > 2.4 && mom && mom.state === 'sleep') { startAct(mom, true) } } else M.seenT = 0
-    if (inp.bite || inp.sy || inp.sx || inp.v) takeOff()
-  }
-  // 煙・スプレーの霧
-  const c = room.coil.pos, drift = Math.sin(W.t * 0.4) * 0.08
-  const sy = M.pos.y - c.y
-  let inSmoke = false
-  if (sy > 0 && sy < 1.25) { const r = 0.12 + sy * 0.18, dx = M.pos.x - (c.x + drift * sy), dz = M.pos.z - (c.z + drift * 0.5 * sy); if (dx * dx + dz * dz < r * r) inSmoke = true }
-  let inMist = 0; for (const m of mist) if (m.visible && m.userData.life > 0 && m.position.distanceTo(M.pos) < m.scale.x * 0.45) inMist++
-  if (inSmoke) { M.dizzy += 0.5 * dt; if (!W.smokeSaid) { W.smokeSaid = true; bubble('me', T().say.smoke) } } else W.smokeSaid = false
-  if (inMist) M.dizzy += Math.min(3, inMist) * 0.5 * dt
-  if (!inSmoke && !inMist) M.dizzy = Math.max(0, M.dizzy - 0.3 * dt)
-  if (M.dizzy >= 1) return kill(inMist ? 'spray' : 'smoke')
-  // 耳元の羽音で起きかける
-  for (const p of people) {
-    if (p.state !== 'sleep') continue
-    const d = M.pos.distanceTo(p.headPos)
-    const buzz = M.state === 'fly' ? clamp((0.55 - d) / 0.45, 0, 1) : 0
-    p.near = buzz
-    const lm = W.light > 0 ? 1.6 : 1
-    if (buzz > 0) p.alert += p.sens * lm * Math.pow(buzz, 1.5) * 0.6 * dt
-    else if (!(M.perch && M.perch.owner === p && M.state === 'suck')) p.alert = Math.max(0, p.alert - 0.035 * dt)
-    if (p.cool > 0) p.alert = Math.min(p.alert, 0.9)
-  }
-  // チュートリアル（1回だけ）
-  stepTut(dt)
-  if (W.t >= NIGHT) endNight()
-}
-function takeOff(shaken) { M.state = 'fly'; M.perch = null; M.vel.set(0, shaken ? 0.4 : 0.2, 0); if (shaken) shake = Math.max(shake, 0.15) }
-function kill(kind) {
-  if (!M.alive) return
-  M.alive = false; M.death = kind; deathT = 0; hitStop = 0.15; flash = 1; shake = 1
-  const snd = { slap: 'slap', uchiwa: 'slap', cat: 'slap', spray: 'thud', smoke: 'thud' }[kind]
-  sfx(snd, { vol: 1 }); if (kind !== 'smoke' && kind !== 'spray') sfx('squish', { vol: 0.7, delay: 0.03 })
-  if (kind === 'cat') sfx('meow', { vol: 0.7, delay: 0.3 })
-  // シミ: 一番近い面（無ければ畳）に貼る
-  drawStain(M.full > 0.05)
-  const s = nearestSurface(M.pos) || { n: new THREE.Vector3(0, 1, 0), p: new THREE.Vector3(M.pos.x, 0.003, M.pos.z) }
-  if (kind === 'smoke' || kind === 'spray') { s.n.set(0, 1, 0); s.p.set(M.pos.x, 0.004, M.pos.z); pushFloor(s.p) }
-  stain.position.copy(s.p).addScaledVector(s.n, 0.002); stain.lookAt(stain.position.clone().add(s.n)); stain.visible = kind !== 'smoke' && kind !== 'spray'
-  stain.scale.setScalar(1 + M.full * 0.8)
-  W.deathAt = s.p.clone(); W.deathN = s.n.clone()
-  bubble('me', T().death[kind], 'big')
-}
-function pushFloor(p) { for (const f of futons) { const lp = f.worldToLocal(_v2.copy(p)); if (Math.abs(lp.x) < 0.5 && lp.z > -0.2 && lp.z < 1.8) { lp.y = 0.085; p.copy(f.localToWorld(lp)) } } }
-
-// ---- 家族の1歩
-function stepPerson(p, dt) {
-  p.t += dt; p.cool = Math.max(0, p.cool - dt)
-  const breath = 0.5 + 0.5 * Math.sin(p.t * (p.id === 'kid' ? 1.9 : 1.3))
-  if (p.state === 'sleep') {
-    // しぐさ（起きかけの合図）
-    if (p.alert > 0.45 && !p.turned && p.turnCool <= 0) { p.turned = true; p.rollTo = (p.roll > 0 ? -1 : 1) * 0.75; sfx('cloth', { vol: 0.45 }); if (Math.random() < 0.6) bubble(p, pick(p.def.react[lang], p.t * 7)); p.turnCool = 6 }
-    if (p.alert < 0.25 && p.turned && p.turnCool <= 0) { p.turned = false; p.rollTo = 0; p.turnCool = 4 }
-    p.turnCool = (p.turnCool || 0) - dt
-    if (p.alert > 0.72 && !p.grumbled) { p.grumbled = true; bubble(p, pick(p.def.react[lang], p.t * 13 + 1)); sfx('grunt', { vol: 0.35 }) }
-    if (p.alert < 0.5) p.grumbled = false
-    if (p.alert >= 1) startAct(p)
-    // 寝言（遊び心。羽音とは関係なく時々）
-    p.talkT -= dt
-    if (p.talkT <= 0) { p.talkT = 9 + W.R() * 14; if (M.pos.distanceTo(p.headPos) < 2.4 && W.t - W.lastTalk > 7) { if (bubble(p, pick(p.def.talk[lang], W.R() * 100))) W.lastTalk = W.t } }
-    // たろうの寝相（転がって父の方へ）
-    if (p.id === 'kid') {
-      W.kidRollT -= dt
-      if (W.kidRollT <= 0 && W.kidRolls < 3) { W.kidRollT = 22 + W.R() * 10; W.kidRolls++; p.rolling = 1; p.rollFrom = p.root.position.x; sfx('cloth', { vol: 0.5 }); sfx('thud', { vol: 0.25, delay: 0.6 }) }
-      if (p.rolling > 0) {
-        p.rolling = Math.max(0, p.rolling - dt / 1.1); const k = 1 - p.rolling
-        p.root.position.x = p.rollFrom - 0.26 * smooth(0, 1, k); p.rollG.rotation.z = k * Math.PI * 2 * (p.rolling > 0 ? 1 : 0)
-        p.root.rotation.y = 0.15 + W.kidRolls * 0.22 * smooth(0, 1, k) + (W.kidRolls - 1) * 0.22 * (1 - smooth(0, 1, k)) * 0
-        if (p.rolling === 0) { p.rollG.rotation.z = 0; p.root.rotation.y = 0.15 + W.kidRolls * 0.22; if (W.kidRolls === 3) bubble(people[0], lang === 'ja' ? 'う…足が…顔に…' : 'Ugh... a foot... on my face...') }
-      }
-    }
-    p.roll = lerp(p.roll, p.rollTo, Math.min(1, dt * 3))
-    if (!p.rolling) p.rollG.rotation.z = p.roll
-    p.sit = lerp(p.sit, 0, Math.min(1, dt * 2.5)); p.armAim = null
-  } else stepAct(p, dt)
-  p.applyPose(breath)
-}
-
-// 起きて叩く
-function startAct(p, seen) {
-  p.state = 'act'; p.act = p.def.wake; p.at = 0; p.hitDone = 0; W.wakes++
-  sfx('cloth', { vol: 0.7 }); sfx('grunt', { vol: 0.55 })
-  if (p.act === 'uchiwa' && W.light <= 0) { W.light = 14; W.lightCount++; room.setLight(true); sfx('switch', { vol: 0.8, delay: 0.25 }); setTimeout(() => bubble('me', T().say.lightOn), 400) }
-  bubble(p, pick(p.def.react[lang], W.t * 3 + 2))
-}
-function shoulder(p) { return p.b.torso.localToWorld(new THREE.Vector3(0, 0.12, 0.02)) }
-function stepAct(p, dt) {
-  p.at += dt
-  const t = p.at, kind = p.act
-  const up = { slap: 0.32, flail: 0.22, uchiwa: 0.4, spray: 0.45 }[kind]
-  p.sit = lerp(p.sit, t < 1.6 + (kind === 'uchiwa' ? 1.2 : 0) ? 0.85 : 0, Math.min(1, dt * 7))
-  const sh = shoulder(p)
-  if (kind === 'slap' || kind === 'flail') {
-    const reach = kind === 'slap' ? 0.85 : 0.6, lockT = kind === 'slap' ? 0.4 : 0.26, clapT = kind === 'slap' ? 0.62 : 0.42
-    if (t >= lockT && !p.aim) { p.aim = M.pos.clone().addScaledVector(M.vel, 0.18); if (kind === 'flail') p.aim.add(new THREE.Vector3(W.R() - 0.5, W.R() - 0.5, W.R() - 0.5).multiplyScalar(0.3)); const d = p.aim.clone().sub(sh); if (d.length() > reach) p.aim = sh.clone().addScaledVector(d.normalize(), reach); sfx('swish', { vol: 0.6 }) }
-    const tgt = p.aim || M.pos
-    const open = t < clapT ? 1 - smooth(lockT, clapT, t) : 0
-    hands.forEach((h, i) => {
-      h.g.visible = t > up * 0.6 && t < 1.7
-      const side = i ? 1 : -1, sideV = new THREE.Vector3(Math.cos(p.root.rotation.y), 0, -Math.sin(p.root.rotation.y))
-      const palm = tgt.clone().addScaledVector(sideV, side * (0.02 + open * 0.28)).add(new THREE.Vector3(0, open * 0.1, 0))
-      if (t < lockT) palm.lerpVectors(sh.clone().add(new THREE.Vector3(0, 0.25, 0)).addScaledVector(sideV, side * 0.3), palm, 0.3)
-      const s0 = sh.clone().addScaledVector(sideV, side * 0.12)
-      placeArm(h, s0, palm, sideV.clone().multiplyScalar(-side))
-    })
-    if (t >= clapT && !p.hitDone) {
-      p.hitDone = 1; sfx('slap', { vol: 0.9 }); shake = Math.max(shake, 0.35)
-      if (M.pos.distanceTo(tgt) < (kind === 'slap' ? 0.17 : 0.15)) kill('slap')
-      else if (M.pos.distanceTo(tgt) < 0.4) { M.vel.addScaledVector(M.pos.clone().sub(tgt).normalize(), 0.8); if (M.state !== 'fly') takeOff(true) }
-    }
-    if (t > 2.6) endAct(p)
-  } else if (kind === 'uchiwa') {
-    const swings = [0.75, 1.35, 1.95]
-    uchiwa.visible = t > 0.3 && t < 2.5
-    let si = swings.findIndex(s => Math.abs(t - s) < 0.3)
-    const dir = M.pos.clone().sub(sh); const dist = dir.length(); dir.normalize()
-    const c = sh.clone().addScaledVector(dir, Math.min(0.95, dist))
-    const sideV = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize()
-    const ph = si >= 0 ? (t - swings[si]) / 0.3 : -1
-    const pos = c.clone().addScaledVector(sideV, si >= 0 ? -ph * 0.4 : 0.35).add(new THREE.Vector3(0, si >= 0 ? 0 : 0.15, 0))
-    uchiwa.position.copy(pos); uchiwa.lookAt(pos.clone().add(sideV)); uchiwa.rotateX(-Math.PI / 2)
-    hands[0].g.visible = uchiwa.visible; if (uchiwa.visible) placeArm(hands[0], sh, pos, sideV)
-    for (let k = 0; k < swings.length; k++) {
-      if (t >= swings[k] && p.hitDone <= k) {
-        p.hitDone = k + 1; sfx('swish', { vol: 0.9, rate: 0.7 })
-        if (M.pos.distanceTo(c) < 0.25 && dist < 1.15) kill('uchiwa')
-        else if (dist < 1.6) { M.vel.addScaledVector(sideV, -1.2); if (M.state !== 'fly') takeOff(true) }
-      }
-    }
-    if (t > 3.4) endAct(p)
-  } else if (kind === 'spray') {
-    can.visible = t > 0.3 && t < 2.4
-    const dir = M.pos.clone().sub(sh).normalize()
-    const cp = sh.clone().addScaledVector(dir, 0.3); can.position.copy(cp); can.lookAt(cp.clone().sub(dir))
-    hands[0].g.visible = can.visible; if (can.visible) placeArm(hands[0], sh, cp, new THREE.Vector3(0, 1, 0))
-    if (t > 0.6 && t < 1.9) {
-      if (!p.sprayed) { p.sprayed = true; sfx('spray', { vol: 0.9 }) }
-      if (Math.random() < 0.6) { const m = mist.find(m => m.userData.life <= 0); if (m) { m.visible = true; m.userData.life = 4; m.position.copy(cp); m.userData.v.copy(dir).multiplyScalar(0.9 + Math.random() * 0.5).add(new THREE.Vector3((Math.random() - .5) * .25, (Math.random() - .5) * .2, (Math.random() - .5) * .25)); m.scale.setScalar(0.12) } }
-    }
-    if (t > 2.8) endAct(p)
-  }
-}
-function placeArm(h, from, to, upHint) {
-  const d = to.clone().sub(from), L = d.length()
-  h.g.position.copy(from); h.arm.scale.set(1, Math.max(0.01, L), 1)
-  h.arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize())
-  h.palm.position.copy(d)
-  h.palm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), d.clone().normalize())
-  if (upHint) { const m = new THREE.Matrix4().lookAt(new THREE.Vector3(), upHint, d.clone().normalize()); h.palm.quaternion.setFromRotationMatrix(m) }
-}
-function endAct(p) {
-  p.state = 'sleep'; p.alert = 0.5; p.sens = Math.min(2.4, p.sens * 1.2); p.cool = 3.5; p.aim = null; p.sprayed = false; p.turned = false
-  hands.forEach(h => h.g.visible = false); uchiwa.visible = false; can.visible = false
-  M.seenT = 0
-}
-// 猫（レア）: 目で追い、近いと猫パンチ
-function stepCat(dt) {
-  const h = cat.headPos, d = M.pos.distanceTo(h)
-  cat.cool = Math.max(0, cat.cool - dt)
-  if (d < 1.4) { const loc = cat.root.worldToLocal(M.pos.clone()); const yaw = Math.atan2(-loc.x, -loc.z), pit = Math.atan2(loc.y - 0.3, Math.hypot(loc.x, loc.z)); cat.neck.rotation.y = lerp(cat.neck.rotation.y, clamp(yaw, -1.2, 1.2), 0.2); cat.neck.rotation.x = lerp(cat.neck.rotation.x, clamp(pit, -0.6, 0.9), 0.2) }
-  if (d < 0.36 && cat.cool <= 0 && !cat.swipe) { cat.swipe = 0.001; cat.aim = M.pos.clone() }
-  if (cat.swipe) {
-    cat.swipe += dt; cat.paw.position.y = 0.075 + Math.sin(Math.min(1, cat.swipe / 0.45) * Math.PI) * 0.22
-    if (cat.swipe > 0.35 && !cat.hit) { cat.hit = true; sfx('swish', { vol: 0.5, rate: 1.4 }); if (M.pos.distanceTo(cat.aim) < 0.16 && M.pos.distanceTo(h) < 0.45) kill('cat') }
-    if (cat.swipe > 0.6) { cat.swipe = 0; cat.hit = false; cat.cool = 2.2 }
-  }
-  if (!W.catSaid && d < 0.9) { W.catSaid = true; sfx('meow', { vol: 0.35 }) }
-}
-
-// ---- チュートリアル（最初の1回。文字は1つずつ）
-function stepTut(dt) {
-  if (W.tut >= 99) { if (M.full > 0.8 && !W.seenFull) { W.seenFull = true; W.restHint = 4 } if (W.restHint > 0) { W.restHint -= dt; tip('rest') } else tip(null); return }
-  if (W.tut < 3 && M.state === 'suck') { W.tut = 3; W.tutT = 0 }
-  if (W.tut === 0) { tip(coarse ? 'moveTouch' : 'movePC'); if (W.movedDist > 0.6) W.tut = 1 }
-  else if (W.tut === 1) { tip('find'); if (glowTarget) W.tut = 2 }
-  else if (W.tut === 2) { tip(coarse ? 'biteTouch' : 'bitePC'); if (M.state === 'suck') { W.tut = 3; W.tutT = 0 } if (!glowTarget && M.state === 'fly') W.tut = 1 }
-  else if (W.tut === 3) { W.tutT += dt; tip(W.tutT > 1.5 ? 'leave' : null); if (M.state === 'fly' && W.tutT > 1.5) { W.tut = 99; tip(null); tutDone = true; try { localStorage.setItem('nm_tut', '1') } catch (e) {} } }
-}
-
-// ---------------------------------------------------------------- 結果（かゆみ報告書）
+// ---------------------------------------------------------------- 結果: 指名手配書
 function score() {
-  const mg = M.total * 3, alive = M.alive
-  const s = mg * (alive ? 1.3 : 1)
-  const rank = W.bites.length === 0 ? 0 : s < 1 ? 1 : s < 2.6 ? 2 : s < 5 ? 3 : 4
-  return { mg: mg.toFixed(2), mgN: mg, bites: W.bites.length, alive, rank, rankName: T().ranks[rank], score: Math.round(s * 100) }
+  const sec = W.t, r = sec < 15 ? 0 : sec < 30 ? 1 : sec < 60 ? 2 : sec < 100 ? 3 : 4
+  return { sec: +fmt(sec), rank: r, rankName: T().ranks[r], bounty: Math.floor(sec * sec * 2).toLocaleString('en-US'), near: W.near, death: M.death, killer: W.killer }
 }
-function endNight() {
-  if (W.ended) return
-  W.ended = true; mode = 'result'
-  hands.forEach(h => h.g.visible = false); uchiwa.visible = false; can.visible = false
-  const r = W.result = score()
-  drawReport(r)
-  show('result'); $('hud').classList.add('hidden'); tip(null); say.t = 0; say.el.classList.add('hidden')
-  const tx = T().postText({ mg: r.mg, bites: r.bites, rank: r.rankName }) + ' ' + T().tags
-  $('btnPost').href = 'https://x.com/intent/post?text=' + encodeURIComponent(tx) + '&url=' + encodeURIComponent('https://tom3games.github.io/night-mosquito/')
-  sfx(r.alive && r.rank >= 2 ? 'win' : 'lose', { vol: 0.7, jitter: 0 }); setTimeout(() => sfx('rank', { vol: 0.8, jitter: 0 }), 900)
-  Snd.duck(0.35, 2.5)
+function endRun() {
+  W.ended = true; const r = score(); W.result = r
+  r.record = r.sec > best; if (r.record) { best = r.sec; try { localStorage.setItem('nm_best', String(best)) } catch (e) {} }
+  mode = 'result'; loopVol('buzz', 0.0001); Snd.loop('bgm', null)
+  $('hud').classList.add('hidden'); say.el.classList.add('hidden'); $('fxWord').classList.add('hidden'); hideEdges(); say.t = 0
+  drawPoster(r, false); show('result')
+  $('report').classList.remove('slam'); void $('report').offsetWidth
+  const post = `https://x.com/intent/post?text=${encodeURIComponent(T().postText({ sec: r.sec, bounty: r.bounty, rank: r.rankName }) + ' ' + T().tags)}&url=${encodeURIComponent('https://tom3games.github.io/night-mosquito/')}`
+  $('btnPost').href = post
+  sfx(r.record ? 'win' : 'lose', { vol: 0.8, jitter: 0 })
+  W.stampTimer = setTimeout(() => { if (mode !== 'result') return; drawPoster(r, true); $('report').classList.add('slam'); sfx('thud', { vol: 1, jitter: 0 }); r.stamped = true }, 850)
 }
-// 体の図の点の位置（正面の人型。0..1）
-const BODY = { forehead: [0.5, 0.1], cheek: [0.36, 0.21], top: [0.5, 0.03], armL: [0.86, 0.58], armR: [0.14, 0.58], footL: [0.63, 0.9], footR: [0.37, 0.9] }
-const FIGC = { dad: '#26304a', mom: '#7a7f8c', kid: '#3f8a5a', gramps: '#c7642e' }
-function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath() }
-// 正面の人の絵（服の色・肌・閉じた目）。itch が多いほど顔がしかめっつら
-function drawFigure(g, x, y, w, h, id, itch) {
-  g.save(); g.translate(x, y); g.lineJoin = 'round'
-  const skinC = '#f0c09a', ink = '#3a2e28', cloth = FIGC[id] || '#555'
-  g.lineWidth = 3; g.strokeStyle = ink
-  // 脚（すね・足は素足）
-  for (const s of [-1, 1]) { g.fillStyle = cloth; rr(g, w / 2 + s * w * 0.13 - w * 0.09, h * 0.6, w * 0.18, h * 0.2, 6); g.fill(); g.stroke(); g.fillStyle = skinC; rr(g, w / 2 + s * w * 0.13 - w * 0.085, h * 0.79, w * 0.17, h * 0.19, 6); g.fill(); g.stroke() }
-  // 腕
-  for (const s of [-1, 1]) { g.save(); g.translate(w / 2 + s * w * 0.27, h * 0.36); g.rotate(s * -0.35); g.fillStyle = cloth; rr(g, -w * 0.07, 0, w * 0.14, h * 0.13, 6); g.fill(); g.stroke(); g.fillStyle = skinC; rr(g, -w * 0.065, h * 0.12, w * 0.13, h * 0.12, 6); g.fill(); g.stroke(); g.restore() }
-  // 胴
-  g.fillStyle = cloth; rr(g, w * 0.24, h * 0.33, w * 0.52, h * 0.31, 10); g.fill(); g.stroke()
-  if (id === 'dad') { g.fillStyle = '#c4161c'; g.beginPath(); g.moveTo(w / 2 - 6, h * 0.34); g.lineTo(w / 2 + 6, h * 0.34); g.lineTo(w / 2 + 4, h * 0.52); g.lineTo(w / 2, h * 0.56); g.lineTo(w / 2 - 4, h * 0.52); g.closePath(); g.fill() }
-  // 頭
-  const hr = w * 0.24, hx = w / 2, hy = h * 0.17
-  g.fillStyle = skinC; rr(g, hx - hr, hy - hr * 0.95, hr * 2, hr * 1.9, hr * 0.5); g.fill(); g.stroke()
-  if (id !== 'gramps') { g.fillStyle = { dad: '#2a2018', mom: '#c96a3a', kid: '#1e1a18' }[id] || '#333'; g.beginPath(); g.moveTo(hx - hr, hy - hr * 0.2); g.quadraticCurveTo(hx - hr, hy - hr * 1.1, hx, hy - hr * 1.05); g.quadraticCurveTo(hx + hr, hy - hr * 1.1, hx + hr, hy - hr * 0.2); g.lineTo(hx + hr * 0.6, hy - hr * 0.55); g.lineTo(hx - hr * 0.6, hy - hr * 0.55); g.closePath(); g.fill(); g.stroke() }
-  else { g.fillStyle = '#e9e4da'; g.beginPath(); g.ellipse(hx, hy + hr * 0.7, hr * 0.7, hr * 0.35, 0, 0, Math.PI); g.fill() }
-  // 目と口（刺されるほどしかめる）
-  g.lineWidth = 2.6
-  for (const s of [-1, 1]) { g.beginPath(); if (itch >= 2) { g.moveTo(hx + s * hr * 0.55, hy - hr * 0.05); g.lineTo(hx + s * hr * 0.2, hy + hr * 0.08) } else { g.arc(hx + s * hr * 0.38, hy, hr * 0.15, 0.15, Math.PI - 0.15) } g.stroke() }
-  g.beginPath(); if (itch >= 1) { g.moveTo(hx - hr * 0.2, hy + hr * 0.5); g.quadraticCurveTo(hx, hy + hr * 0.36, hx + hr * 0.2, hy + hr * 0.5) } else { g.arc(hx, hy + hr * 0.35, hr * 0.18, 0.3, Math.PI - 0.3) } g.stroke()
-  g.restore()
-}
-function drawCat(g, x, y, w) {
-  g.save(); g.translate(x, y); g.fillStyle = '#2e2926'; g.strokeStyle = '#3a2e28'; g.lineWidth = 3
-  g.beginPath(); g.ellipse(w / 2, w * 0.95, w * 0.42, w * 0.3, 0, 0, 7); g.fill()
-  g.beginPath(); g.arc(w / 2, w * 0.55, w * 0.25, 0, 7); g.fill()
-  for (const s of [-1, 1]) { g.beginPath(); g.moveTo(w / 2 + s * w * 0.22, w * 0.45); g.lineTo(w / 2 + s * w * 0.2, w * 0.25); g.lineTo(w / 2 + s * w * 0.06, w * 0.36); g.fill() }
-  g.fillStyle = '#e6cf3a'; for (const s of [-1, 1]) { g.beginPath(); g.ellipse(w / 2 + s * w * 0.1, w * 0.55, w * 0.05, w * 0.04, 0, 0, 7); g.fill() }
-  g.fillStyle = '#111'; for (const s of [-1, 1]) g.fillRect(w / 2 + s * w * 0.1 - 1.5, w * 0.515, 3, w * 0.075)
-  g.strokeStyle = '#2e2926'; g.lineWidth = 7; g.beginPath(); g.moveTo(w * 0.85, w * 1.05); g.quadraticCurveTo(w * 1.05, w * 0.8, w * 0.92, w * 0.62); g.stroke()
-  g.restore()
-}
-// 刺されたあと（ぷっくり）
-function bump(g, x, y, k) { g.fillStyle = 'rgba(240,120,130,.45)'; g.beginPath(); g.arc(x, y, 17 * k, 0, 7); g.fill(); g.fillStyle = '#e04a55'; g.beginPath(); g.arc(x, y, 8 * k, 0, 7); g.fill(); g.fillStyle = '#b3121a'; g.beginPath(); g.arc(x, y, 3 * k, 0, 7); g.fill() }
-function drawReport(r) {
-  const c = $('report'), g = c.getContext('2d'), Wd = 1080, Ht = 1350
-  c.width = Wd; c.height = Ht
-  // わら半紙
-  g.fillStyle = '#efe6cf'; g.fillRect(0, 0, Wd, Ht)
-  for (let i = 0; i < 2600; i++) { g.fillStyle = Math.random() < .5 ? 'rgba(120,100,60,.07)' : 'rgba(255,255,255,.15)'; g.fillRect(Math.random() * Wd, Math.random() * Ht, 2, 2) }
-  g.strokeStyle = 'rgba(80,110,150,.28)'; g.lineWidth = 2; g.beginPath(); g.moveTo(60, 222); g.lineTo(Wd - 60, 222); g.stroke(); g.beginPath(); g.moveTo(60, 850); g.lineTo(Wd - 60, 850); g.stroke()
-  const F = (s, wgt = 700) => `${wgt} ${s}px "Klee One","Zen Kaku Gothic New",sans-serif`
-  const L = T().report
-  g.fillStyle = '#222'; g.font = F(84, 600); g.textBaseline = 'alphabetic'; g.fillText(L.head, 70, 140)
-  g.font = F(34, 600); g.fillStyle = '#444'; g.fillText(L.date, 74, 196)
-  // 家族
-  const fam = people.slice().sort((a, b) => ['dad', 'mom', 'kid', 'gramps'].indexOf(a.id) - ['dad', 'mom', 'kid', 'gramps'].indexOf(b.id))
-  const n = fam.length + (W.cat ? 1 : 0), colW = (Wd - 120) / Math.min(n, 4)
-  fam.forEach((p, i) => {
-    const x = 60 + i * colW, y = 250, fw = Math.min(200, colW - 30), fh = fw * 1.55
-    const counts = {}; for (const b of W.bites) if (b.who === p.id) counts[b.key] = (counts[b.key] || 0) + 1
-    const kh = p.id === 'kid' ? 0.82 : 1, fx = x + (colW - fw) / 2, fy = y + fh * (1 - kh)
-    drawFigure(g, fx, fy, fw, fh * kh, p.id, p.bites.length)
-    for (const k in counts) { const pt = BODY[k]; if (!pt) continue; for (let j = 0; j < counts[k]; j++) bump(g, fx + pt[0] * fw + j * 10, fy + pt[1] * fh * kh + j * 7, 1) }
-    const nb = p.bites.length
-    g.fillStyle = '#222'; g.font = F(40); g.fillText(p.def.name[lang], x + 10, y + fh + 60)
-    g.font = F(34, 600); g.fillStyle = nb ? '#b3121a' : '#555'; g.fillText(nb + (lang === 'ja' ? 'か所' : ' bites'), x + 10, y + fh + 104)
-    const m = MORN[p.id][lang], line = nb === 0 ? m[0] : nb === 1 ? m[1] : nb === 2 ? m[2] : m[3]
-    wrapText(g, '「' + line + '」', x + 10, y + fh + 150, colW - 24, 40, F(30, 600), '#333')
-  })
-  if (W.cat) { const cw = fam.length < 4 ? Math.min(150, colW - 40) : 118, cx = fam.length < 4 ? 60 + fam.length * colW : Wd - 60 - cw, cy = fam.length < 4 ? 250 + 120 : 40; drawCat(g, cx + (fam.length < 4 ? (colW - cw) / 2 : 0), cy, cw); if (fam.length < 4) { g.font = F(40); g.fillStyle = '#222'; g.fillText(lang === 'ja' ? 'ねこ' : 'Cat', cx + 10, 250 + fw0(colW) * 1.55 + 60); wrapText(g, '「' + MORN.cat[lang][0] + '」', cx + 10, 250 + fw0(colW) * 1.55 + 150, colW - 24, 40, F(30, 600), '#333') } }
-  // 下: 吸った血・刺した数・判定ハンコ
-  const by = 940
-  g.fillStyle = '#222'; g.font = F(40, 600); g.fillText(L.blood, 80, by); g.fillText(L.bites, 80, by + 76)
-  g.font = F(64); g.fillStyle = '#b3121a'; g.fillText(r.mg + ' ' + L.mg, 330, by + 4); g.fillText(r.bites + ' ' + L.ka, 330, by + 82)
-  g.font = F(36, 600); g.fillStyle = '#333'
-  g.fillText(r.alive ? L.alive : T().deathNote[M.death], 80, by + 160)
-  if (!r.alive) {   // 壁のシミの絵
-    const sc = stain.userData.c; g.save(); g.globalAlpha = 0.95; g.drawImage(sc, 620, by + 100, 120, 120); g.restore()
-    g.font = F(26, 600); g.fillStyle = '#555'; g.fillText(L.wall, 616, by + 246)
+function drawImg(g, name, x, y, h, flip) { const im = TEX[name].image, w = h * im.width / im.height; g.save(); g.translate(x, y); if (flip) g.scale(-1, 1); g.drawImage(im, -w / 2, -h, w, h); g.restore(); return w }
+function drawPoster(r, stamped) {
+  const c = $('report'), W_ = 900, H_ = 1240; if (c.width !== W_) { c.width = W_; c.height = H_ }
+  const g = c.getContext('2d'), P = T().poster, F = '"Potta One"'
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W_, H_)
+  // 紙（色あせた手配書。角は手で破いたように）
+  g.fillStyle = '#ecdcae'; g.beginPath(); const rough = [[0, 8], [220, 0], [510, 10], [900, 0], [892, 330], [900, 760], [888, 1240], [520, 1230], [240, 1240], [6, 1232], [0, 700]]; rough.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill()
+  g.strokeStyle = '#2b1c10'; g.lineWidth = 7; g.strokeRect(34, 34, W_ - 68, H_ - 68)
+  // 見出し
+  g.fillStyle = '#2b1c10'; g.textAlign = 'center'; g.textBaseline = 'alphabetic'
+  g.font = `${lang === 'ja' ? 130 : 128}px ${F}`; g.fillText(P.wanted, W_ / 2, 170)
+  // 顔写真（身長の線の前に蚊）
+  const bx = 150, by = 200, bw = 600, bh = 410
+  g.fillStyle = '#d9c692'; g.fillRect(bx, by, bw, bh)
+  g.strokeStyle = 'rgba(43,28,16,.55)'; g.lineWidth = 3; for (let i = 1; i < 6; i++) { g.beginPath(); g.moveTo(bx, by + bh * i / 6); g.lineTo(bx + bw, by + bh * i / 6); g.stroke() }
+  drawImg(g, 'm_front', W_ / 2, by + bh - 12, 372)
+  g.lineWidth = 7; g.strokeStyle = '#2b1c10'; g.strokeRect(bx, by, bw, bh)
+  // 名前・罪状
+  g.fillStyle = '#2b1c10'; g.font = `600 ${lang === 'ja' ? 40 : 36}px "Klee One"`; g.fillText(`${P.name}　${P.crime}`, W_ / 2, 668)
+  // 秒（主役）
+  g.textAlign = 'left'; const secS = fmt(r.sec), lb = P.alive
+  g.font = `600 44px "Klee One"`; const lw = g.measureText(lb).width
+  g.font = `150px ${F}`; const sw = g.measureText(secS).width
+  g.font = `600 56px "Klee One"`; const uw = g.measureText(P.sec).width
+  const total = lw + 22 + sw + 12 + uw, x0 = (W_ - total) / 2
+  g.font = `600 44px "Klee One"`; g.fillText(lb, x0, 820)
+  g.font = `150px ${F}`; g.fillStyle = '#a81f14'; g.fillText(secS, x0 + lw + 22, 820)
+  g.font = `600 56px "Klee One"`; g.fillStyle = '#2b1c10'; g.fillText(P.sec, x0 + lw + 22 + sw + 12, 820)
+  // 懸賞金
+  g.textAlign = 'center'; g.font = `600 ${lang === 'ja' ? 50 : 42}px "Klee One"`; g.fillText(`${P.bounty} ${r.bounty}${P.yen}`, W_ / 2, 900)
+  // 討伐者（絵＋死因）
+  const kid = r.killer || 'dad'
+  drawImg(g, `${kid}_walk`, 190, 1188, kid === 'cat' || kid === 'pig' ? 150 : 250)
+  g.textAlign = 'left'; g.fillStyle = '#2b1c10'; g.font = `600 ${lang === 'ja' ? 36 : 30}px "Klee One"`
+  const fam = FAM[kid]; g.fillText(`${P.by}: ${fam.name[lang]}`, 320, 1000)
+  g.font = `600 ${lang === 'ja' ? 30 : 26}px "Klee One"`; (T().deathNote[r.death] || '').split('\n').forEach((s, i) => g.fillText(s, 320, 1048 + i * 40))
+  if (r.near > 0) { g.font = `600 ${lang === 'ja' ? 28 : 24}px "Klee One"`; g.fillStyle = '#5b4a2f'; g.fillText(`${P.near} ${r.near}${P.times}`, 320, 1160) }
+  // 新記録の走り書き
+  if (r.record) { g.save(); g.translate(742, 262); g.rotate(0.16); g.fillStyle = '#a81f14'; g.font = `${lang === 'ja' ? 52 : 40}px ${F}`; g.textAlign = 'center'; g.fillText(P.record, 0, 0); g.restore() }
+  // 判子（発表）
+  if (stamped) {
+    const name = r.rankName
+    g.save(); g.translate(690, 1085); g.rotate(-0.2); g.strokeStyle = '#c0261a'; g.fillStyle = '#c0261a'; g.globalAlpha = 0.9; g.lineWidth = 10; g.beginPath(); g.arc(0, 0, 138, 0, 7); g.stroke(); g.lineWidth = 3.5; g.beginPath(); g.arc(0, 0, 122, 0, 7); g.stroke()
+    g.textAlign = 'center'; g.textBaseline = 'middle'
+    const parts = T().rankLines[r.rank]
+    const fs = lang === 'ja' ? (Math.max(...parts.map(s => s.length)) > 3 ? 50 : 60) : 38
+    g.font = `${fs}px ${F}`; parts.forEach((s, i) => g.fillText(s, 0, (i - (parts.length - 1) / 2) * (fs + 6)))
+    g.restore()
   }
-  // ハンコ
-  g.save(); g.translate(Wd - 230, by + 40); g.rotate(-0.18); g.strokeStyle = '#c4161c'; g.fillStyle = '#c4161c'; g.lineWidth = 9
-  g.beginPath(); g.arc(0, 0, 130, 0, 7); g.stroke(); g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 112, 0, 7); g.stroke()
-  g.textAlign = 'center'; const rn = r.rankName
-  const size = lang === 'ja' ? (rn.length > 6 ? 34 : 44) : (rn.length > 14 ? 22 : 28)
-  if (lang === 'ja' && rn.length > 5) { const h = Math.ceil(rn.length / 2); g.font = F(size); g.fillText(rn.slice(0, h), 0, -6); g.fillText(rn.slice(h), 0, size + 2) }
-  else { g.font = F(size); wrapCenter(g, rn, 0, 0, 200, size + 4) }
-  g.restore()
-  g.font = '500 24px "Zen Kaku Gothic New",sans-serif'; g.fillStyle = '#777'; g.textAlign = 'left'; g.fillText('tom3games.github.io/night-mosquito', 80, Ht - 50)
 }
-const fw0 = colW => Math.min(200, colW - 30)
-function wrapText(g, s, x, y, w, lh, font, col) {
-  g.font = font; g.fillStyle = col; let line = '', yy = y
-  const parts = lang === 'ja' ? [...s] : s.split(/(\s+)/)
-  for (const ch of parts) { if (g.measureText(line + ch).width > w && line) { g.fillText(line, x, yy); line = ch.trimStart(); yy += lh } else line += ch }
-  if (line) g.fillText(line, x, yy)
-}
-function wrapCenter(g, s, x, y, w, lh) { const words = s.split(' '); const lines = []; let l = ''; for (const wd of words) { if (g.measureText(l + ' ' + wd).width > w && l) { lines.push(l); l = wd } else l = l ? l + ' ' + wd : wd } lines.push(l); lines.forEach((t, i) => g.fillText(t, x, y + (i - (lines.length - 1) / 2) * lh + lh * 0.3)) }
 
 // ---------------------------------------------------------------- 描画
-const clockH = $('clockH'), clockM = $('clockM')
 function frame(now) {
   requestAnimationFrame(frame)
-  if (!lastT) lastT = now
-  let dt = Math.min(0.1, (now - lastT) / 1000); lastT = now
+  const t = performance.now()
+  if (!lastT) lastT = t
+  const dt = Math.min(0.1, (t - lastT) / 1000); lastT = t
   if (mode === 'play' && !paused && !frozen) {
     if (hitStop > 0) { hitStop -= dt } else { simAcc += dt; let n = 0; while (simAcc >= STEP && n < 8) { stepOnce(); simAcc -= STEP; n++ } if (n >= 8) simAcc = 0 }
   }
-  if (mode === 'title' && W) titleDrift(dt)
-  render(dt)
+  if (mode === 'play') render(dt)
 }
-function titleDrift(dt) {
-  W.t += dt * 0.3
-  const a = performance.now() / 1000
-  M.pos.set(0.55 + Math.sin(a * 0.5) * 0.25, 0.95 + Math.sin(a * 0.9) * 0.1, 0.55 + Math.cos(a * 0.4) * 0.2)
-  camYaw = -0.8 + Math.sin(a * 0.15) * 0.4; camPitch = -0.35
-  room.fan.root.rotation.y = -2.45; room.fan.neck.rotation.y = Math.sin(a * 0.7) * 0.75
-  for (const p of people) { p.t += dt; p.applyPose(0.5 + 0.5 * Math.sin(p.t * 1.3)) ; p.updateWorld() }
+const edgeEls = []
+function hideEdges() { for (const e of edgeEls) e.el.classList.add('hidden') }
+function edge(i, id, hot, vx, vy) {
+  if (!edgeEls[i]) { const el = document.createElement('div'); el.className = 'edge hidden'; el.innerHTML = '<i></i>'; $('hud').appendChild(el); edgeEls[i] = { el, id: null } }
+  const e = edgeEls[i]; if (e.id !== id) { e.id = id; e.el.firstChild.style.backgroundImage = `url(img/${id === 'teeth' ? 'p_teeth' : id + '_walk'}.webp?v=4)`; e.el.dataset.id = id; e.el.classList.toggle('thing', id === 'teeth') }
+  e.el.classList.remove('hidden'); e.el.classList.toggle('hot', hot)
+  e.el.style.transform = `translate(${vx}px,${vy}px)`
 }
-const proj = new THREE.Vector3()
+// 画面の外なら端に出す。戻り値は出したか
+function edgeFor(i, wx, wy, wz, id, hot, w, h) {
+  proj.set(wx, wy, wz).project(camera)
+  const behind = proj.z > 1, on = !behind && Math.abs(proj.x) < 0.95 && Math.abs(proj.y) < 0.95
+  if (on) return false
+  let nx = behind ? -proj.x : proj.x, ny = behind ? -proj.y : proj.y; const mg = Math.max(Math.abs(nx), Math.abs(ny)) || 1; nx /= mg; ny /= mg
+  edge(i, id, hot, clamp((nx + 1) / 2 * w, 30, w - 30) - 24, clamp((1 - ny) / 2 * h, 96, h - 196) - 24)
+  return true
+}
+const proj = new THREE.Vector3(), camTarget = new THREE.Vector3(), lookAt = new THREE.Vector3()
 function render(dt) {
-  const w = innerWidth, h = innerHeight
-  if (renderer.domElement.width !== Math.floor(w * renderer.getPixelRatio()) || renderer.domElement.height !== Math.floor(h * renderer.getPixelRatio())) { renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix() }
+  const w = innerWidth, h = innerHeight, pr = renderer.getPixelRatio()
+  if (renderer.domElement.width !== Math.floor(w * pr) || renderer.domElement.height !== Math.floor(h * pr)) { renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix() }
+  if (!W) { renderer.render(scene, camera); return }
   const tnow = performance.now() / 1000
-  // 蚊の見た目
-  M.flap += dt * 60
-  const flying = M.state === 'fly' || M.state === 'land'
-  mos.wings.forEach((wg, i) => { wg.rotation.z = (i ? -1 : 1) * (flying ? (M.flap % 2 < 1 ? 0.7 : -0.3) : 0.12); wg.rotation.y = flying ? 0 : (i ? -1 : 1) * 1.15 })
-  mos.wingMat.opacity = flying ? 0.22 : 0.4
-  mos.setFull(M.full)
-  if (M.alive) {
-    mos.root.position.copy(M.pos)
-    if (M.state === 'fly') {
-      const hd = Math.hypot(M.vel.x, M.vel.z) > 0.05 ? Math.atan2(-M.vel.x, -M.vel.z) : camYaw
-      mos.root.rotation.set(-M.vel.y * 0.6, hd, 0, 'YXZ'); mos.root.position.y += Math.sin(tnow * 9) * 0.002
-    } else {
-      const n = M.state === 'rest' ? M.perch.n : M.perch.wn
-      const f = new THREE.Vector3(-Math.sin(camYaw), 0, -Math.cos(camYaw)); f.addScaledVector(n, -f.dot(n)); if (f.lengthSq() < 1e-4) f.set(0, 0, -1); f.normalize()
-      const m = new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(n, f.clone().negate()).normalize(), n, f.clone().negate()); mos.root.quaternion.setFromRotationMatrix(m)
-      if (M.state === 'suck') mos.root.rotateX(0.25)
-    }
-  } else if (W && W.deathAt) {
-    // やられた: シミの上にぺしゃんこ、煙なら落ちて裏返る
-    const k = Math.min(1, deathT / 0.6)
-    if (M.death === 'smoke' || M.death === 'spray') { mos.root.position.lerpVectors(M.pos, W.deathAt.clone().add(new THREE.Vector3(0, 0.004, 0)), k * k); mos.root.rotation.set(0, mos.root.rotation.y, Math.PI * k) }
-    else { mos.root.position.copy(W.deathAt).addScaledVector(W.deathN, 0.003); mos.root.scale.set(1.3, 0.25, 1.3); mos.root.lookAt(mos.root.position.clone().add(W.deathN)); mos.root.rotateX(Math.PI / 2) }
-  }
-  // カメラ（蚊の斜め後ろ・少し上）
-  const fwd = new THREE.Vector3(-Math.sin(camYaw) * Math.cos(camPitch), Math.sin(camPitch), -Math.cos(camYaw) * Math.cos(camPitch))
-  let camTarget
+  // カメラ（蚊の斜め後ろ・高め）
+  const fx = -Math.sin(camYaw) * Math.cos(camPitch), fy = Math.sin(camPitch), fz = -Math.cos(camYaw) * Math.cos(camPitch)
   if (camOverride) { camera.position.copy(camOverride[0]); camera.lookAt(camOverride[1]) }
-  else if (mode === 'title') {
-    const a = tnow * 0.05
-    camera.position.set(1.45 + Math.sin(a) * 0.15, 1.55, 1.35); camera.lookAt(-0.35, 0.15 + Math.sin(a * 2) * 0.05, -0.9)
-  } else if (M.alive || !W || !W.deathAt) {
-    camDist = lerp(camDist, M.state === 'fly' ? 0.1 + M.full * 0.025 : 0.17, Math.min(1, dt * 4)); const dist = camDist
-    const side = new THREE.Vector3(Math.cos(camYaw), 0, -Math.sin(camYaw))
-    camTarget = M.pos.clone().addScaledVector(fwd, -dist).addScaledVector(side, 0.028).add(new THREE.Vector3(0, 0.045, 0))
-    pushOut(camTarget, 0.006)
-    camera.position.lerp(camTarget, mode === 'title' ? 0.05 : Math.min(1, dt * 14))
-    if (camera.position.distanceTo(M.pos) > 1.2) camera.position.copy(camTarget)
-    camera.lookAt(M.pos.clone().addScaledVector(fwd, 0.07).add(new THREE.Vector3(0, 0.012, 0)))
-  } else {
-    const n = W.deathN, p = W.deathAt.clone().addScaledVector(n, 0.13).add(new THREE.Vector3(0.03, 0.03, 0))
-    camera.position.lerp(p, Math.min(1, dt * 5)); camera.lookAt(W.deathAt)
+  else if (M.alive || deathT < 0.3) {
+    camTarget.set(M.pos.x - fx * 1.75, M.pos.y - fy * 1.75 + 0.5, M.pos.z - fz * 1.75)
+    camTarget.x = clamp(camTarget.x, ROOM.x0 + 0.18, ROOM.x1 - 0.18); camTarget.z = clamp(camTarget.z, ROOM.z0 + 0.18, ROOM.z1 - 0.18); camTarget.y = clamp(camTarget.y, 0.25, ROOM.h - 0.1)
+    camera.position.lerp(camTarget, Math.min(1, dt * 11))
+    lookAt.set(M.pos.x + fx * 0.65, M.pos.y + fy * 0.65 + 0.3, M.pos.z + fz * 0.65)
+    camera.lookAt(lookAt)
   }
-  if (shake > 0) { camera.position.add(new THREE.Vector3((Math.random() - .5) * shake * 0.01, (Math.random() - .5) * shake * 0.01, 0)); shake = Math.max(0, shake - dt * 3) }
-  camera.fov = window.__og ? 46 : lerp(camera.fov, 64 + M.wind * 8 + M.dizzy * 6, 0.1); camera.updateProjectionMatrix()
-  if (M.dizzy > 0.1) camera.rotation.z += Math.sin(tnow * 3) * M.dizzy * 0.12
-  // 扇風機の羽
-  room.fan.blades.rotation.z -= dt * 40
-  room.coil.ember.material.emissiveIntensity = 2.5 + Math.sin(tnow * 3) * 0.6
-  // 煙の粒（判定と同じ柱の中）
-  const c = room.coil.pos
-  for (const s of smoke) {
-    const u = s.userData; u.t += dt * 0.35; if (u.t > 1) u.t -= 1
-    const y = u.t * 1.25, drift = Math.sin((W ? W.t : tnow) * 0.4) * 0.08
-    s.position.set(c.x + drift * y + Math.sin(u.ph + y * 4) * 0.05 * y, c.y + y, c.z + drift * 0.5 * y + Math.cos(u.ph + y * 3) * 0.05 * y)
-    s.scale.setScalar(0.04 + y * 0.22); s.material.opacity = (1 - u.t) * Math.min(1, u.t * 6) * 0.34
+  if (shake > 0.001) { camera.rotation.z += (Math.random() - .5) * 0.06 * shake; camera.position.y += (Math.random() - .5) * 0.05 * shake; shake = Math.max(0, shake - dt * 2.8) }
+  camera.updateMatrixWorld()
+  // 蚊
+  const r = mos.root
+  r.quaternion.copy(camera.quaternion)
+  const rx = Math.cos(camYaw), rz = -Math.sin(camYaw), lateral = M.vel.x * rx + M.vel.z * rz
+  if (M.alive) {
+    r.position.copy(M.pos); r.position.y += Math.sin(tnow * 11) * 0.012
+    r.rotateZ(-lateral * 0.13)
+    if (Math.abs(lateral) > 0.3) M.flip = lateral > 0 ? 1 : -1
+    setMosFrame(M.cough > 0.12 ? 'm_cough' : M.panic > 0 ? 'm_panic' : 'm_back')
+    mos.body.scale.x = mos.w * (M.frame === 'm_back' ? M.flip : 1)
+    const a = Math.sin(tnow * 70) * 0.55 + 0.25
+    mos.wl.rotation.z = -a; mos.wr.rotation.z = a; mos.wl.visible = mos.wr.visible = true
+    mos.shadow.visible = true; mos.shadow.position.set(M.pos.x, 0.02, M.pos.z); const sc = 1 - M.pos.y / 5; mos.shadow.scale.setScalar(sc)
+    loopVol('buzz', 0.05 + Math.hypot(M.vel.x, M.vel.y, M.vel.z) * 0.05, 0.9 + Math.hypot(M.vel.x, M.vel.y, M.vel.z) * 0.12)
+  } else if (W.deathAt) {
+    // やられた: 回りながら床へ落ちる
+    const k = Math.min(1, deathT / 0.9), y = lerp(W.deathAt.y, 0.14, k * k)
+    r.position.set(W.deathAt.x, y, W.deathAt.z); r.rotateZ(k * 3.4 * M.flip)
+    mos.wl.visible = mos.wr.visible = false
+    const s = 1 + (k < 0.15 ? k * 3 : 0.45); r.scale.setScalar(s)
+    lookAt.lerp(r.position, Math.min(1, dt * 4)); camera.lookAt(lookAt); loopVol('buzz', 0.0001)
   }
-  for (const m of mist) { if (m.userData.life <= 0) { m.visible = false; continue } if (mode === 'play' && !paused) { m.userData.life -= dt; m.position.addScaledVector(m.userData.v, dt); m.userData.v.multiplyScalar(0.96); m.scale.setScalar(Math.min(0.7, m.scale.x + dt * 0.35)) } m.material.opacity = Math.min(1, m.userData.life / 2) * 0.35 }
-  // 光る肌
-  let gi = 0
-  if (mode === 'play' && M.alive && M.state === 'fly') {
-    for (const p of people) { if (p.state !== 'sleep') continue; for (const s of p.spots) { if (!s.ok || gi >= glows.length) continue; const d = M.pos.distanceTo(s.w); if (d > 0.7) continue; const g = glows[gi++]; g.visible = true; g.position.copy(s.w).addScaledVector(s.wn, 0.01); const on = s === glowTarget; g.scale.setScalar(on ? 0.055 : 0.035); g.material.opacity = (on ? 0.95 : 0.45 * (1 - d / 0.7)) * (0.75 + 0.25 * Math.sin(tnow * 5)) * (s.stock > 0 ? 1 : 0.3) } }
-  }
-  for (; gi < glows.length; gi++) glows[gi].visible = false
-  // 起きかけの顔・z
+  // 人物（カメラの方を向く切り絵）
   for (const p of people) {
-    p.decal.material.opacity = smooth(0.35, 0.85, p.alert) * (p.state === 'sleep' ? 1 : 1)
-    const hp = p.headPos
-    p.zT += dt
-    const camNear = clamp((camera.position.distanceTo(hp) - 0.3) / 0.4, 0, 1)
-    p.zs.forEach((z, i) => { const ph = (p.zT * 0.35 + i / 3) % 1; z.position.set(hp.x + 0.08 + ph * 0.1, hp.y + 0.15 + ph * 0.3, hp.z + Math.sin(ph * 6) * 0.03); z.material.opacity = (p.alert < 0.3 && p.state === 'sleep' ? 1 : 0) * Math.sin(ph * Math.PI) * 0.8 * camNear; z.scale.setScalar(0.035 + ph * 0.04) })
+    const m = p.mesh, dx = camera.position.x - p.pos.x, dz = camera.position.z - p.pos.z
+    let bob = 0, sway = 0, sx = 1, sy = 1
+    const sp = Math.hypot(p.vel.x, p.vel.z)
+    if (p.state === 'chase' && sp > 0.2) { const ph = p.t * (7 + sp * 3); bob = Math.abs(Math.sin(ph)) * 0.07; sway = Math.sin(ph) * 0.09 }
+    if (p.state === 'wake') { sway = p.wiggle || 0; sy = 0.7 + Math.min(1, p.t / 0.4) * 0.3; sx = 1.2 - Math.min(1, p.t / 0.4) * 0.2 }
+    if (p.state === 'act' && p.act) {
+      const a = p.act
+      if (a.phase === 'wind') { const k = clamp(a.t / a.w, 0, 1); sy = 1 + k * 0.06; sx = 1 - k * 0.05; sway = Math.sin(a.t * 30) * 0.015 * k + (p.kind === 'leap' ? Math.sin(a.t * 40) * 0.06 : 0) }
+      if (a.phase === 'strike') { const k = clamp(a.t / 0.1, 0, 1); sy = 1 - k * 0.1 * (1 - a.t); sx = 1 + k * 0.08 * (1 - a.t) }
+    }
+    // 叩く時は蚊の方へ少し踏み込む
+    let lx = 0, lz = 0
+    if (p.lunge) { const d = Math.hypot(M.pos.x - p.pos.x, M.pos.z - p.pos.z) || 1; lx = (M.pos.x - p.pos.x) / d * p.lunge; lz = (M.pos.z - p.pos.z) / d * p.lunge }
+    m.position.set(p.pos.x + lx, p.y + bob, p.pos.z + lz)
+    m.rotation.set(0, Math.atan2(dx, dz), 0, 'YXZ'); m.rotateZ(sway)
+    if (Math.abs(p.vel.x * rx + p.vel.z * rz) > 0.3) p.flip = (p.vel.x * rx + p.vel.z * rz) > 0 ? -1 : 1
+    m.scale.set(p.w * sx * (p.state === 'act' ? 1 : p.flip), p.h * sy, 1)
+    // 体が蚊を隠すなら薄くする
+    proj.copy(M.pos).sub(camera.position); const camToM = proj.length(), camToP = Math.hypot(dx, dz)
+    p.mat.opacity = camToP < camToM - 0.1 && camToP < 1.2 ? 0.45 : 1
+    p.shadow.position.set(m.position.x, 0.015, m.position.z); p.shadow.visible = true; const ss = Math.max(0.5, 1 - p.y * 0.3); p.shadow.scale.setScalar(ss)
+    p.head.set(m.position.x, p.y + p.data.h * 1.02, m.position.z)
   }
-  // HUD
-  if (mode === 'play' && W) {
-    const hours = W.t / NIGHT * 6, hh = (23 + Math.floor(hours)) % 24, mm = Math.floor((hours % 1) * 60)
-    clockH.setAttribute('transform', `rotate(${((hh % 12) + mm / 60) * 30} 20 22)`); clockM.setAttribute('transform', `rotate(${mm * 6} 20 22)`)
-    $('clockT').textContent = `${hh}:${String(mm).padStart(2, '0')}`
-    const bb = $('btnBite')
-    const st = !M.alive ? 'off' : M.state === 'suck' || M.state === 'land' || M.state === 'rest' ? 'leave' : glowTarget ? 'bite' : nearSurface ? 'rest' : 'off'
-    if (bb.dataset.s !== st) { bb.dataset.s = st; $('biteLbl').textContent = T().lbl[st] }
+  for (const b of teethPool) if (b.alive) { b.m.quaternion.copy(camera.quaternion); b.m.rotateZ(tnow * 14) }
+  for (const b of bursts) if (b.visible) b.quaternion.copy(camera.quaternion)
+  room.fan.rotation.y = Math.atan2(camera.position.x - room.fan.position.x, camera.position.z - room.fan.position.z)
+  room.pull.rotation.z = Math.sin(tnow * 1.7) * 0.1
+  // 手札: 時計・むせ・白光り
+  $('clockT').textContent = fmt(W.t)
+  $('clockS').setAttribute('transform', `rotate(${(W.t * 6) % 360} 20 22)`)
+  $('fxCough').style.opacity = clamp(M.cough * 0.9, 0, 0.9)
+  if (flash > 0) { $('fxFlash').style.opacity = flash * 0.75; flash = Math.max(0, flash - dt * 3.5); if (flash === 0) $('fxFlash').style.opacity = 0 }
+  if (W.nearUntil && W.t > W.nearUntil) { $('nearW').classList.add('hidden'); W.nearUntil = 0 }
+  // 画面外の人の顔を端に出す（攻撃中は赤）
+  let ei = 0
+  if (mode === 'play') {
+    for (const p of people) if (edgeFor(ei, p.pos.x, p.y + p.data.h * 0.75, p.pos.z, p.id, p.state === 'act', w, h)) ei++
+    for (const b of teethPool) if (b.alive && edgeFor(ei, b.pos.x, b.pos.y, b.pos.z, 'teeth', true, w, h)) ei++
+    for (let i = ei; i < edgeEls.length; i++) edgeEls[i].el.classList.add('hidden')
   }
-  if (say.t > 0) {
-    say.t -= dt
-    let pos = null
-    if (say.who === 'me') pos = M.pos.clone().add(new THREE.Vector3(0, 0.03, 0))
-    else if (say.who && say.who.headPos) pos = say.who.headPos.clone().add(new THREE.Vector3(0, 0.3, 0))
-    if (pos) { proj.copy(pos).project(camera); const vis = proj.z < 1 && Math.abs(proj.x) < 1.1 && Math.abs(proj.y) < 1.1; const x = clamp((proj.x * 0.5 + 0.5) * w, 90, w - 90), y = clamp((-proj.y * 0.5 + 0.5) * h, 70, h - 160); say.el.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`; say.el.classList.toggle('hidden', say.t <= 0); say.el.classList.toggle('off', !vis) }
-    if (say.t <= 0) say.el.classList.add('hidden')
-  }
-  $('fxFlash').style.opacity = flash; flash = Math.max(0, flash - dt * 3)
-  $('fxDizzy').style.opacity = clamp(M.dizzy, 0, 1) * 0.8
-  // 音
-  if (Snd.ctx && ambOn) {
-    const play = mode === 'play' && !paused
-    let near = 0; for (const p of people) near = Math.max(near, p.near || 0)
-    loopVol('buzz', play && M.alive && (M.state === 'fly' || M.state === 'land') ? 0.08 + near * 0.55 : 0.0001, 1 + M.full * -0.18 + M.wind * 0.1)
-    const fanD = M.pos.distanceTo(room.fan.root.position)
-    loopVol('fan', 0.06 + clamp(1 - fanD / 3, 0, 1) * 0.3 + M.wind * 0.3)
-    const dad = people.find(p => p.id === 'dad'); loopVol('snore', dad && dad.alert < 0.4 && dad.state === 'sleep' ? 0.04 + clamp(1 - M.pos.distanceTo(dad.headPos) / 2, 0, 1) * 0.3 : 0.0001)
-    loopVol('amb', 0.22 * (1 - smooth(NIGHT - 25, NIGHT, W ? W.t : 0)))
+  // 吹き出しの位置
+  if (say.who && say.t > 0 && !say.el.classList.contains('hidden')) {
+    proj.copy(say.who.head).project(camera); const behind = proj.z > 1
+    const bw = say.el.offsetWidth, bh = say.el.offsetHeight
+    const px = clamp(((behind ? -proj.x : proj.x) + 1) / 2 * w - bw / 2, 8, w - bw - 8), py = clamp((1 - (behind ? -1 : proj.y)) / 2 * h - bh - 10, 78, h - 240)
+    say.el.style.transform = `translate(${Math.round(px)}px,${Math.round(py)}px)`
   }
   renderer.render(scene, camera)
 }
 
+// ---------------------------------------------------------------- 検証用: 今見えている危険の一覧（bot と検証が読む。ゲーム本体は使わない）
+function threats() {
+  const out = []
+  for (const p of people) {
+    const a = p.act; if (!a) continue
+    if (a.ring && (a.kind === 'swat' || a.kind === 'zap' || a.kind === 'leap')) out.push({ type: 'point', pos: a.aim.clone(), r: a.r, left: a.phase === 'wind' ? a.w - a.t : 0, age: a.t, who: p.id, locked: a.locked })
+    if (a.kind === 'spray' && (a.phase === 'wind' || a.phase === 'fire')) out.push({ type: 'cone', o: mouth(p, new THREE.Vector3()), dir: a.dir.clone(), L: SPRAY.L, half: SPRAY.half, firing: a.phase === 'fire', age: a.phase === 'wind' ? a.t : 9, who: p.id })
+    if (a.kind === 'net' && (a.phase === 'wind' || a.phase === 'sweep')) out.push({ type: 'sector', c: p.pos.clone(), dir: a.dir.clone(), h: a.h, r1: NET.r1, half: NET.half, dy: NET.dy, age: a.phase === 'wind' ? a.t : 9, who: p.id })
+  }
+  for (const b of teethPool) if (b.alive) out.push({ type: 'ball', pos: b.pos.clone(), vel: b.vel.clone(), r: 0.17, age: b.t + 0.3, who: 'gramps' })
+  for (const c of columns) out.push({ type: 'column', x: c.x, z: c.z, r: c.r, h: c.h, age: 9, who: 'pig' })
+  return out
+}
+
 // ---------------------------------------------------------------- 起動
 applyLang()
-const bootStart = performance.now()
-const fontsReady = document.fonts ? Promise.race([Promise.all(['600 40px "Klee One"', '400 40px "Yuji Syuku"'].map(f => document.fonts.load(f, 'かゆみ報告書夏の夜蚊刺吸血朝生きのびた父母たろうじいちゃんAa0'))), new Promise(r => setTimeout(r, 4000))]).catch(() => {}) : Promise.resolve()
-Promise.all([loadFamily(manager), fontsReady]).then(() => {
-  newNight(1)
-  mode = 'title'; M.pos.set(0.35, 0.95, -0.2)
-  const b = $('boot'); bootProgress(1); $('bootMsg').textContent = T().loadingDone
-  setTimeout(() => { b.classList.add('gone'); setTimeout(() => b.remove(), 600) }, 350)
+const fontsReady = document.fonts ? Promise.race([Promise.all(['400 40px "Potta One"', '600 40px "Klee One"'].map(f => document.fonts.load(f, '指名手配夏の夜蚊逃亡秒懸賞金円討伐父母たろうじいちゃんAa0'))), new Promise(r => setTimeout(r, 4000))]).catch(() => {}) : Promise.resolve()
+Promise.all([loadAll(), fontsReady]).then(() => {
+  room = buildRoom(scene, TEX)
+  buildActors()
+  mode = 'title'
+  const b = $('boot'); b.style.setProperty('--p', 1); $('bootMsg').textContent = T().loadingDone
+  setTimeout(() => { b.classList.add('gone'); setTimeout(() => b.remove(), 600) }, 300)
   show('title')
   window.__nmReady = true
 }).catch(e => { $('bootMsg').textContent = 'load error: ' + e.message; throw e })
-setTimeout(() => { const b = $('boot'); if (b && !window.__nmReady) { b.classList.add('gone') } }, 12000)
+setTimeout(() => { const b = $('boot'); if (b && !window.__nmReady) b.classList.add('gone') }, 12000)
 requestAnimationFrame(frame)
 
 // ---------------------------------------------------------------- 検証用の窓口
 window.nm = {
-  start, toTitle, get W() { return W }, M, people: () => people, get cat() { return cat }, room,
-  get mode() { return mode },
+  start, toTitle, get W() { return W }, M, people: () => people, threats, FOG_T, FOG_DUR, ROOM, setMosFrame,
+  get mode() { return mode }, get camYaw() { return camYaw }, get best() { return best }, get paused() { return paused }, get stick() { return stick },
+  get cone() { return cone }, get sector() { return sector }, get camera() { return camera }, get swatter() { return swatter }, get fog() { return fog },
   dbg: {
     pause(on = true) { frozen = on },
     step(n = 1) { for (let i = 0; i < n; i++) { if (mode !== 'play') break; stepOnce() } },
     input(fn) { testInput = fn },
+    noAuto(v = true) { noAuto = v },
     setCam(y, p) { camYaw = y; camPitch = p },
-    render() { render(0.016) },
-    cam(p, l, up) { camOverride = p ? [new THREE.Vector3(...p), new THREE.Vector3(...l)] : null; camera.up.set(...(up || [0, 1, 0])) },
+    setT(t) { W.t = t; W.d = t / 100 },
+    render(n = 1, dt = 0.016) { for (let i = 0; i < n; i++) render(dt) },
+    cam(p, l) { camOverride = p ? [new THREE.Vector3(...p), new THREE.Vector3(...l)] : null },
+    spawn(id) { return spawnPerson(id) },
+    gap(v) { W.gap = v },
   },
-  score, nearestSpot, glow: () => glowTarget, hands, uchiwa, can,
-  state: () => ({ mode, t: W && W.t, full: M.full, total: M.total, alive: M.alive, death: M.death, bites: W && W.bites.length, mstate: M.state, dizzy: M.dizzy, light: W && W.light, alerts: people.map(p => [p.id, +p.alert.toFixed(2), p.state]) }),
+  score,
+  state: () => ({ mode, t: W && +W.t.toFixed(2), alive: M.alive, death: M.death, near: W && W.near, cough: +M.cough.toFixed(2), n: people.length, who: people.map(p => [p.id, p.state, p.act && p.act.phase]) }),
 }

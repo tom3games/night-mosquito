@@ -15,12 +15,13 @@ for (const [name, bt, opts] of [['chromium', chromium, {}], ['webkit', webkit, {
   p.on('requestfailed', r => errs.push('fail ' + r.url()))
   await p.goto(URL0 + '?t=' + Date.now(), { waitUntil: 'networkidle' })
   await p.waitForFunction(() => window.__nmReady, null, { timeout: 15000 })
-  // ---- 遊びの通し（タイトル → 遊ぶ → 結果）
+  // ---- 遊びの通し（タイトル → 飛び立つ → 結果 → もう一回）
   await p.addScriptTag({ url: URL0 + 'bots.js' })
   if (name === 'webkit') await p.tap('#btnStart'); else await p.click('#btnStart')
   await p.waitForTimeout(500)
-  const r = await p.evaluate(() => { nm.dbg.pause(true); nm.dbg.input(__bot('skilled')); let n = 0; while (nm.mode === 'play' && n < 12000) { nm.dbg.step(60); n += 60 } return { mode: nm.mode, bites: nm.W.bites.length, shown: !document.getElementById('result').classList.contains('hidden'), mute: window.__muteOk() } })
+  const r = await p.evaluate(() => { nm.dbg.pause(true); nm.dbg.input(__bot('pro')); nm.W.tut = 3; let n = 0; while (nm.mode === 'play' && n < 16000) { nm.dbg.step(60); n += 60 } return { mode: nm.mode, sec: nm.W.t.toFixed(1), death: nm.M.death, shown: !document.getElementById('result').classList.contains('hidden'), mute: window.__muteOk() } })
   out.push(`${name}: play ${JSON.stringify(r)}`)
+  await p.waitForTimeout(1100)
   await p.screenshot({ path: `shots/live-${name}.png` })
   const og = await p.evaluate(async () => { const r = await fetch(document.querySelector('meta[property="og:image"]').content); return r.status + ' ' + r.headers.get('content-type') })
   out.push(`${name}: og=${og} errors=${errs.length ? errs.join(' | ') : 'none'}`)

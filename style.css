@@ -1,114 +1,122 @@
 [hidden]{display:none!important}
-:root{--ink:#0b0d16;--paper:#efe6cf;--lamp:#ff9a48;--coil:#3f6b3a;--blood:#b3121a;--moon:#c9d4f2}
+:root{--ink:#1b1612;--paper:#ecdcae;--red:#c0261a;--coil:#3f6b3a;--sky:#d7ecfb}
 *{box-sizing:border-box;margin:0;padding:0}
-html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%;background:var(--ink);height:100%}
-body{height:100svh;overflow:hidden;background:var(--ink);color:#f1ede2;font-family:"Zen Kaku Gothic New",system-ui,sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%;background:var(--paper);height:100%}
+body{height:100svh;overflow:hidden;background:var(--paper);color:var(--ink);font-family:"Zen Kaku Gothic New",system-ui,sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 button,a{font-family:inherit;color:inherit;touch-action:manipulation}
 button{border:0;background:none;cursor:pointer}
 .hidden{display:none!important}
 #view{position:fixed;inset:0;touch-action:none}
 #view canvas{display:block;width:100%;height:100%}
 #fxFlash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:6}
-#fxDizzy{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:5;background:radial-gradient(ellipse at center,rgba(190,198,170,.18) 20%,rgba(120,140,100,.75) 100%);backdrop-filter:blur(1px)}
-#boot-err{position:fixed;inset:auto 8px 8px 8px;z-index:99;background:#fff;color:#b00;font:12px/1.4 monospace;white-space:pre-wrap;padding:10px;border-radius:8px}
+/* むせる: 周りから薄緑がかぶる */
+#fxCough{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:5;background:radial-gradient(ellipse at center,rgba(198,232,180,.12) 22%,rgba(140,190,120,.88) 100%)}
+#boot-err{position:fixed;inset:auto 8px 8px 8px;z-index:99;background:#fff;color:#b00;font:12px/1.4 monospace;white-space:pre-wrap;padding:10px}
 
 /* ---------- 読み込み中: 蚊取り線香 */
-.boot{position:fixed;inset:0;z-index:50;background:radial-gradient(ellipse at 50% 40%,#1a1f30 0%,#0b0d16 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .5s}
+.boot{position:fixed;inset:0;z-index:50;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .4s}
 .boot.gone{opacity:0;pointer-events:none}
-.coil{width:min(46vw,46vh,220px);height:auto;filter:drop-shadow(0 6px 16px rgba(0,0,0,.6))}
-#coilEmber{filter:drop-shadow(0 0 4px #ff6a2a);animation:ember 1.1s ease-in-out infinite}
-@keyframes ember{50%{opacity:.6}}
+.coil{width:min(46vw,46vh,220px);height:auto}
+#coilEmber{animation:ember 1.1s ease-in-out infinite}
+@keyframes ember{50%{opacity:.5}}
 .wisp{position:relative;width:60px;height:60px;margin-top:-150px;margin-bottom:60px;pointer-events:none}
-.wisp i{position:absolute;left:28px;bottom:0;width:6px;height:6px;border-radius:50%;background:rgba(220,226,235,.35);filter:blur(3px);animation:wisp 3.2s linear infinite}
+.wisp i{position:absolute;left:28px;bottom:0;width:7px;height:7px;border-radius:50%;background:rgba(120,110,100,.42);animation:wisp 3.2s linear infinite}
 .wisp i:nth-child(2){animation-delay:1.1s}.wisp i:nth-child(3){animation-delay:2.1s}
-@keyframes wisp{0%{transform:translate(0,0) scale(1);opacity:0}15%{opacity:1}100%{transform:translate(14px,-70px) scale(5);opacity:0}}
-.boot-msg{font-family:"Klee One",sans-serif;font-size:18px;letter-spacing:.08em;color:var(--moon)}
+@keyframes wisp{0%{transform:translate(0,0) scale(1);opacity:0}15%{opacity:1}100%{transform:translate(14px,-70px) scale(4);opacity:0}}
+.boot-msg{font-family:"Klee One",sans-serif;font-weight:600;font-size:18px;letter-spacing:.04em}
 
 /* ---------- 画面共通 */
 .screen{position:fixed;inset:0;z-index:20;height:100svh;overflow:hidden}
-.go{background:var(--coil);color:#f6f1e3;font-weight:700;font-size:20px;letter-spacing:.06em;padding:14px 30px;border-radius:6px;box-shadow:0 5px 0 #233f20,0 10px 24px rgba(0,0,0,.45);transition:transform .08s}
-.go:active{transform:translateY(3px);box-shadow:0 2px 0 #233f20}
-.go.small{font-size:17px;padding:11px 24px}
-.text-btn{font-size:15px;color:var(--moon);text-decoration:none;padding:10px 8px;opacity:.9}
-.mini{font-size:14px;color:rgba(241,237,226,.88);text-decoration:none;min-height:44px;display:inline-flex;align-items:center;padding:0 10px;border-bottom:1px solid rgba(241,237,226,.25)}
+/* 一番押してほしいボタンだけ、蚊取り線香の箱の緑で厚みをつける */
+.go{background:var(--coil);color:#fff8e2;font-family:"Potta One","Zen Kaku Gothic New",sans-serif;font-size:26px;padding:11px 34px 13px;border:3px solid var(--ink);box-shadow:0 6px 0 var(--ink);transform:rotate(-1.2deg);transition:transform .08s,box-shadow .08s}
+.go:active{transform:translateY(4px) rotate(-1.2deg);box-shadow:0 2px 0 var(--ink)}
+.go.small{font-size:21px;padding:8px 26px 10px}
+.mini{font-size:13.5px;font-weight:700;text-decoration:none;min-height:44px;display:inline-flex;align-items:center;padding:0 9px;background:rgba(255,246,220,.9);border:2px solid var(--ink);margin:1px 2px;white-space:nowrap}
 
-/* タイトル: 部屋の上に筆の題字 */
-#title{background:linear-gradient(90deg,rgba(11,13,22,.82) 0%,rgba(11,13,22,.35) 55%,rgba(11,13,22,0) 80%)}
-.title-block{position:absolute;left:max(24px,env(safe-area-inset-left));bottom:max(64px,calc(env(safe-area-inset-bottom) + 56px));max-width:min(520px,86vw)}
-#title h1{font-family:"Yuji Syuku",serif;font-weight:400;font-size:clamp(52px,13vw,96px);line-height:1.05;color:#f4efe2;text-shadow:0 4px 18px rgba(0,0,0,.7);letter-spacing:.02em}
-html[lang=en] #title h1{font-size:clamp(38px,8vw,72px)}
-.sub{margin:14px 0 24px;font-size:15px;line-height:1.7;color:#d9d3c4;max-width:26em;text-shadow:0 2px 8px rgba(0,0,0,.8)}
-.title-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.foot{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:max(10px,env(safe-area-inset-bottom));display:flex;gap:8px}
+/* タイトル: イラストが主役。下に題字 */
+#title{background:#d7cf8c}
+.title-art{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 0}
+.title-block{position:absolute;left:0;right:0;bottom:0;padding:0 max(18px,env(safe-area-inset-left)) max(4px,env(safe-area-inset-bottom))}
+#title h1{font-family:"Potta One",sans-serif;font-weight:400;font-size:clamp(50px,15.5vw,66px);line-height:1;color:#fffbe9;-webkit-text-stroke:2.5px var(--ink);paint-order:stroke fill;text-shadow:3px 4px 0 var(--ink);transform:rotate(-2deg);transform-origin:left bottom}
+html[lang=en] #title h1{font-size:clamp(38px,11vw,50px)}
+.sub{margin:10px 0 12px;font-size:15px;font-weight:700;line-height:1.5;color:var(--ink);white-space:pre-line;text-shadow:0 0 6px #e9e0a6,0 0 6px #e9e0a6,0 0 6px #e9e0a6}
+.title-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.best{font-family:"Klee One",sans-serif;font-weight:600;font-size:14px;color:var(--red);white-space:nowrap}
+.foot{display:flex;gap:2px;margin:4px 0 2px -2px}
 
-/* 遊び方: 箱の裏の注意書き（緑の帯の紙） */
-#how{background:rgba(6,8,14,.72);display:flex;align-items:center;justify-content:center;padding:16px}
-.notice{background:#f3ecd8;color:#2a2a26;width:min(560px,100%);max-height:calc(100svh - 32px);overflow:hidden;border-top:14px solid var(--coil);padding:18px 22px 14px;font-family:"Klee One",sans-serif;display:flex;flex-direction:column;gap:8px}
-.notice h2{font-size:22px;font-weight:600;color:var(--coil)}
-.notice ol{padding-left:1.3em;font-size:15px;line-height:1.55;display:flex;flex-direction:column;gap:4px}
-.keys{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-size:14px;line-height:1.4;border-top:1px dashed #b8ae92;padding-top:8px}
-.keys dt{font-weight:600;color:#2f5a2b}.keys dd{color:#3a3832}
-.notice .go{align-self:flex-start;margin-top:4px}
-.credit{font-size:11px;color:#7a7566}
+/* 遊び方: 町内の回覧板（ベージュの紙に押しピン） */
+#how{background:#b98b5a;display:flex;align-items:center;justify-content:center;padding:12px}
+.notice{position:relative;background:#f6ecd0;width:min(520px,100%);max-height:calc(100svh - 24px);overflow:hidden;border:3px solid var(--ink);padding:14px 16px 10px;font-family:"Klee One",sans-serif;font-weight:600;display:flex;flex-direction:column;gap:7px;transform:rotate(-.5deg)}
+.notice::before{content:"";position:absolute;left:50%;top:4px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--red);border:2px solid var(--ink)}
+.notice h2{font-family:"Potta One",sans-serif;font-weight:400;font-size:21px;margin-top:6px}
+.notice ol{padding-left:1.25em;font-size:14.5px;line-height:1.45;display:flex;flex-direction:column;gap:3px}
+.who{display:grid;grid-template-columns:repeat(4,1fr);gap:0 2px;align-items:end}
+.who figure{display:flex;flex-direction:column;align-items:center;min-width:0}
+.who img{height:clamp(64px,14svh,118px);width:100%;object-fit:contain;object-position:50% 100%}
+.who figcaption{font-size:11.5px;line-height:1.25;text-align:center;white-space:nowrap}
+.who b{display:block;font-size:13px}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:1px 12px;font-size:13.5px;line-height:1.4;border-top:2px dashed #8a7a55;padding-top:6px}
+.keys dd{color:#4a3f2a}
+.notice .go{align-self:flex-start;margin-top:3px}
+.credit{font-size:10.5px;line-height:1.3;color:#6b604a;font-weight:400}
 
 /* 一時停止 */
-#pause{background:rgba(6,8,14,.6);display:flex;align-items:center;justify-content:center}
-.pause-box{display:flex;flex-direction:column;align-items:center;gap:14px;font-size:20px}
+#pause{background:rgba(233,217,172,.86);display:flex;align-items:center;justify-content:center}
+.pause-box{display:flex;flex-direction:column;align-items:center;gap:12px;font-family:"Potta One",sans-serif;font-size:30px}
+.pause-box .mini{font-family:"Zen Kaku Gothic New",sans-serif}
 
 /* ---------- 遊び中 */
 #hud{position:fixed;inset:0;z-index:10;pointer-events:none}
 #hud button{pointer-events:auto}
-.clock{position:absolute;left:max(12px,env(safe-area-inset-left));top:max(10px,env(safe-area-inset-top));display:flex;align-items:center;gap:6px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
-.clock svg{width:40px;height:44px}
-.clock b{font-family:"Klee One",sans-serif;font-size:16px;font-weight:600;color:#f3ead4}
-.corner{position:absolute;right:max(10px,env(safe-area-inset-right));top:max(8px,env(safe-area-inset-top));width:46px;height:46px;display:grid;place-items:center;border-radius:50%;background:rgba(11,13,22,.45);border:1.5px solid rgba(243,234,212,.4)}
-.corner svg{width:20px;height:20px;fill:#f3ead4}
-.tip{position:absolute;left:50%;top:max(66px,calc(env(safe-area-inset-top) + 56px));transform:translateX(-50%);font-family:"Klee One",sans-serif;font-weight:600;font-size:17px;color:#fff6e6;text-shadow:0 2px 8px #000,0 0 2px #000;white-space:nowrap;animation:tipin .4s ease-out}
-@keyframes tipin{from{opacity:0;transform:translate(-50%,-6px)}}
+/* 目覚まし時計に秒数 */
+.clock{position:absolute;left:max(12px,env(safe-area-inset-left));top:max(10px,env(safe-area-inset-top));display:flex;align-items:center;gap:5px}
+.clock svg{width:44px;height:48px;filter:drop-shadow(0 1px 0 rgba(255,250,230,.8))}
+.clock-t{display:flex;flex-direction:column;line-height:1}
+.clock b{font-family:"Potta One",sans-serif;font-weight:400;font-size:32px;color:#fffbe9;-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;font-variant-numeric:tabular-nums}
+.clock small{font-size:11.5px;font-weight:700;color:var(--ink);text-shadow:0 0 4px #fff6dc,0 0 4px #fff6dc;margin-top:2px;min-height:12px}
+.corner{position:absolute;right:max(10px,env(safe-area-inset-right));top:max(8px,env(safe-area-inset-top));width:46px;height:46px;display:grid;place-items:center}
+.corner svg{width:24px;height:24px;fill:var(--ink);filter:drop-shadow(0 0 2px #fff6dc)}
+.tip{position:absolute;left:50%;top:max(72px,calc(env(safe-area-inset-top) + 62px));transform:translateX(-50%);font-family:"Klee One",sans-serif;font-weight:600;font-size:18px;color:var(--ink);background:#fff6dc;border:2.5px solid var(--ink);padding:4px 12px 5px;white-space:nowrap}
+.near{position:absolute;left:50%;top:42%;font-family:"Potta One",sans-serif;font-size:34px;color:#ffe25a;-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;transform:translate(-50%,-50%) rotate(-7deg);animation:near .5s ease-out both}
+@keyframes near{0%{transform:translate(-50%,-30%) rotate(-7deg) scale(.6)}18%{transform:translate(-50%,-55%) rotate(-7deg) scale(1.15)}100%{transform:translate(-50%,-90%) rotate(-7deg) scale(1);opacity:.1}}
 .touch{position:absolute;inset:0;pointer-events:none}
-.stickzone{position:absolute;left:0;bottom:0;width:calc(max(16px,env(safe-area-inset-left)) + 62px + 90px);height:calc(max(16px,env(safe-area-inset-bottom)) + 62px + 90px);pointer-events:auto;touch-action:none}
-.stick{position:absolute;left:calc(max(16px,env(safe-area-inset-left)) + 62px);top:calc(100% - max(16px,env(safe-area-inset-bottom)) - 62px);width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;border:2px solid rgba(201,212,242,.4);background:rgba(11,13,22,.25);opacity:.7;pointer-events:none}
+.stickzone{position:absolute;left:0;bottom:0;width:calc(max(16px,env(safe-area-inset-left)) + 62px + 92px);height:calc(max(18px,env(safe-area-inset-bottom)) + 62px + 92px);pointer-events:auto;touch-action:none}
+.stick{position:absolute;left:calc(max(16px,env(safe-area-inset-left)) + 62px);top:calc(100% - max(18px,env(safe-area-inset-bottom)) - 62px);width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;border:3px solid var(--ink);background:rgba(255,246,220,.28);opacity:.88}
 .stick.held{opacity:1}
-.stick .knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(243,234,212,.85)}
-.wing{position:absolute;right:calc(max(14px,env(safe-area-inset-right)) + 104px);width:52px;height:52px;border-radius:50%;background:rgba(11,13,22,.35);border:2px solid rgba(201,212,242,.35);color:#e8ecf8;display:grid;place-items:center;pointer-events:auto;touch-action:none}
-.wing svg{width:36px;height:30px}
-.wing.up{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 104px)}
-.wing.down{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 40px)}
-.wing.on{background:rgba(201,212,242,.35)}
-.bite{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(30px,calc(env(safe-area-inset-bottom) + 24px));width:88px;height:88px;border-radius:50%;background:rgba(11,13,22,.45);border:2px solid rgba(243,234,212,.3);color:rgba(243,234,212,.45);display:grid;place-items:center;touch-action:none;transition:background .15s,border-color .15s,color .15s}
-.bite svg{width:52px;height:52px;display:none;grid-area:1/1}
-.bite .lbl{position:absolute;left:50%;bottom:-2px;transform:translate(-50%,100%);font-family:"Klee One",sans-serif;font-weight:600;font-size:13px;color:#f3ead4;text-shadow:0 1px 4px #000;white-space:nowrap}
-.bite[data-s=off] .lbl{opacity:.55}
-.bite[data-s=off] .i-bite,.bite[data-s=bite] .i-bite{display:block}
-.bite[data-s=rest] .i-rest{display:block}
-.bite[data-s=leave] .i-leave{display:block}
-.bite[data-s=bite]{background:rgba(179,18,26,.85);border-color:#ffb3a0;color:#fff;box-shadow:0 0 0 6px rgba(255,140,120,.25),0 0 24px rgba(255,120,100,.6);animation:biteglow .9s ease-in-out infinite}
-.bite[data-s=rest]{background:rgba(63,107,58,.85);border-color:#cfe6c0;color:#fff}
-.bite[data-s=leave]{background:rgba(201,212,242,.25);border-color:#c9d4f2;color:#fff}
-@keyframes biteglow{50%{box-shadow:0 0 0 12px rgba(255,140,120,.08),0 0 30px rgba(255,120,100,.8)}}
+.stick .knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:#fff6dc;border:3px solid var(--ink)}
+/* 羽で上下。手前の親指に寄せて2段 */
+.wing{position:absolute;right:max(16px,env(safe-area-inset-right));width:72px;height:72px;border-radius:50%;background:rgba(255,246,220,.72);border:3px solid var(--ink);display:grid;place-items:center;pointer-events:auto;touch-action:none}
+.wing svg{width:50px;height:46px}
+.wing.up{bottom:calc(max(18px,env(safe-area-inset-bottom)) + 84px)}
+.wing.down{bottom:max(18px,env(safe-area-inset-bottom))}
+.wing.on{background:#ffe25a;transform:scale(.94)}
+/* 画面の外にいる人の顔 */
+.edge{position:absolute;left:0;top:0;width:48px;height:48px;border-radius:50%;background:#fff6dc;border:3px solid var(--ink);overflow:hidden}
+.edge i{position:absolute;inset:0;background-repeat:no-repeat;background-size:180%;background-position:50% 2%}
+.edge.thing i{background-size:80%;background-position:50% 50%}
+.edge.hot{background:#ff8f7c;border-color:var(--red);box-shadow:0 0 0 3px var(--red)}
 
-/* 吹き出し（寝言） */
-.say{position:fixed;left:0;top:0;z-index:12;pointer-events:none;font-family:"Klee One",sans-serif;font-weight:600;font-size:16px;line-height:1.35;color:#2a2620;background:#f3ead4;padding:7px 12px;border-radius:14px;max-width:min(66vw,280px);box-shadow:0 4px 14px rgba(0,0,0,.45)}
-.say::after{content:"";position:absolute;left:50%;bottom:-8px;margin-left:-6px;border:7px solid transparent;border-top-color:#f3ead4;border-bottom:0}
-.say.off{opacity:0}
-.say.big{font-size:30px;padding:8px 18px;background:#fff;color:var(--blood);font-family:"Yuji Syuku",serif;font-weight:400}
+/* 吹き出し */
+.say{position:fixed;left:0;top:0;z-index:12;pointer-events:none;width:max-content;font-family:"Klee One",sans-serif;font-weight:600;font-size:16px;line-height:1.3;color:var(--ink);background:#fffbe9;border:2.5px solid var(--ink);padding:5px 11px 6px;border-radius:50% / 60%;max-width:min(72vw,270px);text-align:center;will-change:transform}
+/* 死んだ時の大きな文字 */
+.word{position:fixed;left:50%;top:30%;z-index:13;pointer-events:none;font-family:"Potta One",sans-serif;font-size:clamp(64px,20vw,88px);color:#ffe25a;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;text-shadow:4px 5px 0 var(--ink);white-space:nowrap;transform:translate(-50%,-50%) rotate(-8deg);animation:word .28s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes word{0%{transform:translate(-50%,-50%) rotate(-8deg) scale(2.4);opacity:0}100%{transform:translate(-50%,-50%) rotate(-8deg) scale(1)}}
 
-/* ---------- 結果: かゆみ報告書 */
-#result{background:rgba(6,8,14,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px}
-#report{height:calc(100svh - 140px);width:auto;max-width:calc(100vw - 24px);aspect-ratio:1080/1350;object-fit:contain;box-shadow:0 12px 40px rgba(0,0,0,.6);transform:rotate(-.6deg);animation:paper .6s cubic-bezier(.2,.8,.3,1)}
-@keyframes paper{from{transform:translateY(40px) rotate(-3deg);opacity:0}}
-.result-actions{display:flex;flex-direction:column;align-items:center;gap:6px}
-.result-actions .row{display:flex;gap:10px}
-@media (max-height:560px) and (orientation:landscape){
-  #result{flex-direction:row;gap:20px}
-  #report{height:calc(100svh - 24px)}
-  .title-block{bottom:52px}
-  .sub{margin:8px 0 14px;font-size:13.5px}
-  #title h1{font-size:clamp(40px,9vh,64px)}
-  .notice{padding:12px 18px 10px;gap:5px}.notice ol{font-size:13px;line-height:1.4}.notice h2{font-size:18px}
-  .stick{width:108px;height:108px;margin:-54px 0 0 -54px}
-}
-@media (max-height:700px) and (orientation:portrait){
-  .notice ol{font-size:13.5px;line-height:1.45}
-  .sub{font-size:14px;margin:10px 0 18px}
+/* ---------- 結果: 手配書を壁に貼る */
+#result{background:linear-gradient(90deg,#c47a2a 0 7px,#1b1612 7px 10px,transparent 10px calc(100% - 10px),#1b1612 calc(100% - 10px) calc(100% - 7px),#c47a2a calc(100% - 7px)) #fbefcf;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px 8px max(4px,env(safe-area-inset-bottom))}
+#report{width:min(calc(100vw - 16px),calc((100svh - 118px) * .7258));height:auto;aspect-ratio:900/1240;margin-top:auto;transform:rotate(-.7deg);filter:drop-shadow(0 4px 0 rgba(27,22,18,.5));animation:paper .42s cubic-bezier(.2,.8,.3,1) both}
+#report.slam{animation:slam .3s ease-out}
+@keyframes paper{from{transform:translateY(-110%) rotate(-5deg)}}
+@keyframes slam{0%{transform:rotate(-.7deg) scale(1)}30%{transform:rotate(.6deg) scale(.975)}100%{transform:rotate(-.7deg) scale(1)}}
+.result-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:0 2px;margin:auto -8px 0;align-self:stretch;background:#d7cf8c;border-top:3px solid var(--ink);padding:8px 8px 4px;margin-bottom:calc(-1 * max(4px,env(safe-area-inset-bottom)))}
+.result-actions .go{margin-right:6px}
+@media (max-height:700px){
+  .notice{padding:10px 14px 6px;gap:4px}
+  .notice h2{font-size:18px;margin-top:6px}
+  .notice ol{font-size:13px;line-height:1.36}
+  .keys{font-size:12.5px}
+  .sub{font-size:14px;margin:8px 0 8px}
+  .go{font-size:23px;padding:8px 28px 10px}
+  .go.small{font-size:19px;padding:6px 22px 8px}
+  #report{width:min(calc(100vw - 16px),calc((100svh - 122px) * .7258))}
 }

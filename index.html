@@ -3,72 +3,71 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>夏の夜の蚊 | 蚊になって血を吸う3Dバカゲー（無料・スマホ）</title>
-<meta name="description" content="蚊になって、夏の夜の和室で寝ている家族の血を吸う3Dのバカゲー。耳元で羽音を立てると起きかけて、手やうちわが飛んでくる。蚊取り線香の煙と扇風機の風に気をつけて、朝のかゆみ報告書をめざす。スマホのブラウザで無料で遊べる蚊のゲーム。">
+<title>夏の夜の蚊 | 家族の攻撃をよけて何秒生きのびる？蚊の3Dバカゲー（無料・スマホ）</title>
+<meta name="description" content="自分が蚊になって、起きた家族の攻撃を飛び回ってかわす3Dのバカゲー。父のハエたたき、母の殺虫スプレー、息子の虫取り網、じいちゃんの入れ歯をよけて何秒生きのびるか。結果は懸賞金つきの手配書。スマホのブラウザで無料で遊べる。">
 <meta property="og:type" content="website">
 <meta property="og:title" content="夏の夜の蚊">
-<meta property="og:description" content="蚊になって、寝ている家族の血を吸う3Dバカゲー。耳元で鳴くと手が飛んでくる。朝には家族のかゆみ報告書。スマホで無料で遊べる。">
-<meta property="og:image" content="https://tom3games.github.io/night-mosquito/og.png?v=1">
+<meta property="og:description" content="蚊になって、起きた家族の攻撃をよけて何秒生きのびるか。ハエたたき、スプレー、虫取り網、飛んでくる入れ歯。スマホで無料で遊べる3Dバカゲー。">
+<meta property="og:image" content="https://tom3games.github.io/night-mosquito/og.png?v=4">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="https://tom3games.github.io/night-mosquito/">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#0b0d16">
+<meta name="theme-color" content="#e9d9ac">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Klee+One:wght@400;600&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=3">
+<link href="https://fonts.googleapis.com/css2?family=Potta+One&family=Klee+One:wght@400;600&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=4">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 </head>
 <body>
 <div id="view"></div>
-<div id="fxDizzy"></div><div id="fxFlash"></div>
+<div id="fxCough"></div><div id="fxFlash"></div>
 
 <!-- 遊び中 -->
 <section id="hud" class="hidden">
-  <div class="clock" aria-hidden="true">
-    <svg viewBox="0 0 40 44"><path d="M7 8l5-4M33 8l-5-4" stroke="#c9a24a" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="22" r="16" fill="#f3ead4" stroke="#c9a24a" stroke-width="3"/><g stroke="#3a3326" stroke-width="1.4"><path d="M20 8v2.5M34 22h-2.5M20 36v-2.5M6 22h2.5"/></g><path id="clockH" d="M20 22V14" stroke="#2a2a2a" stroke-width="2.6" stroke-linecap="round"/><path id="clockM" d="M20 22V10" stroke="#2a2a2a" stroke-width="1.6" stroke-linecap="round"/><circle cx="20" cy="22" r="1.6" fill="#b3121a"/><path d="M11 39l-3 4M29 39l3 4" stroke="#c9a24a" stroke-width="2.5"/></svg>
-    <b id="clockT">23:00</b>
+  <div class="clock">
+    <svg viewBox="0 0 40 44" aria-hidden="true"><path d="M7 8l5-4M33 8l-5-4" stroke="#1b1612" stroke-width="3.4" stroke-linecap="round"/><circle cx="20" cy="22" r="16" fill="#fff6dc" stroke="#1b1612" stroke-width="3"/><path d="M20 22V14" stroke="#1b1612" stroke-width="2.6" stroke-linecap="round"/><path id="clockS" d="M20 22V9" stroke="#c0261a" stroke-width="1.8" stroke-linecap="round"/><circle cx="20" cy="22" r="1.8" fill="#1b1612"/><path d="M11 39l-3 4M29 39l3 4" stroke="#1b1612" stroke-width="2.6"/></svg>
+    <div class="clock-t"><b id="clockT">0.0</b><small id="hudBest"></small></div>
   </div>
   <p id="tip" class="tip hidden"></p>
-  <button id="btnPause" class="corner" aria-label="pause"><svg viewBox="0 0 20 20"><rect x="4.5" y="3.5" width="4" height="13" rx="1"/><rect x="11.5" y="3.5" width="4" height="13" rx="1"/></svg></button>
-  <div id="touch" class="touch hidden">
+  <p id="nearW" class="near hidden"></p>
+  <button id="btnPause" class="corner" aria-label="pause"><svg viewBox="0 0 20 20"><rect x="4.5" y="3.5" width="4" height="13"/><rect x="11.5" y="3.5" width="4" height="13"/></svg></button>
+  <div id="touch" class="touch">
     <div id="stickZone" class="stickzone"><div id="stick" class="stick"><div class="knob"></div></div></div>
-    <button id="btnUp" class="wing up" aria-label="up"><svg viewBox="0 0 48 40"><path d="M24 30C14 26 5 20 4 13c-1-5 6-6 11-3 4 2 7 7 9 12" fill="rgba(220,232,255,.35)" stroke="currentColor" stroke-width="2"/><path d="M24 30c10-4 19-10 20-17 1-5-6-6-11-3-4 2-7 7-9 12" fill="rgba(220,232,255,.35)" stroke="currentColor" stroke-width="2"/><path d="M8 13l7 5M40 13l-7 5" stroke="currentColor" stroke-width="1"/><path d="M18 9l6-6 6 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg></button>
-    <button id="btnDown" class="wing down" aria-label="down"><svg viewBox="0 0 48 40"><path d="M24 12C14 16 5 22 4 29c-1 5 6 6 11 3 4-2 7-7 9-12" fill="rgba(220,232,255,.35)" stroke="currentColor" stroke-width="2"/><path d="M24 12c10 4 19 10 20 17 1 5-6 6-11 3-4-2-7-7-9-12" fill="rgba(220,232,255,.35)" stroke="currentColor" stroke-width="2"/><path d="M18 31l6 6 6-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg></button>
+    <button id="btnUp" class="wing up" aria-label="up"><svg viewBox="0 0 48 44"><path d="M22 34C13 34 3 30 2 22c-1-6 7-7 12-4" fill="#d7ecfb" stroke="#1b1612" stroke-width="2.4"/><path d="M26 34c9 0 19-4 20-12 1-6-7-7-12-4" fill="#d7ecfb" stroke="#1b1612" stroke-width="2.4"/><path d="M24 3 37 21H29V38H19V21H11Z" fill="#c0261a" stroke="#1b1612" stroke-width="2.6" stroke-linejoin="round"/></svg></button>
+    <button id="btnDown" class="wing down" aria-label="down"><svg viewBox="0 0 48 44"><path d="M22 10C13 10 3 14 2 22c-1 6 7 7 12 4" fill="#d7ecfb" stroke="#1b1612" stroke-width="2.4"/><path d="M26 10c9 0 19 4 20 12 1 6-7 7-12 4" fill="#d7ecfb" stroke="#1b1612" stroke-width="2.4"/><path d="M24 41 37 23H29V6H19V23H11Z" fill="#c0261a" stroke="#1b1612" stroke-width="2.6" stroke-linejoin="round"/></svg></button>
   </div>
-  <button id="btnBite" class="bite" data-s="off" aria-label="bite">
-    <svg class="i-bite" viewBox="0 0 64 64"><ellipse cx="24" cy="30" rx="9" ry="7" fill="currentColor"/><circle cx="34" cy="30" r="5" fill="currentColor"/><path d="M37 32l20 14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M16 31c-8 1-12 4-14 6" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><path d="M22 36l-4 12M27 36l1 13M31 35l6 11" stroke="currentColor" stroke-width="1.6"/></svg>
-    <svg class="i-rest" viewBox="0 0 64 64"><path d="M6 52h52" stroke="currentColor" stroke-width="3"/><ellipse cx="32" cy="30" rx="10" ry="6" fill="currentColor"/><path d="M24 33l-8 18M30 35l-2 17M36 35l3 17M41 33l9 18" stroke="currentColor" stroke-width="2"/></svg>
-    <svg class="i-leave" viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="8" ry="6" fill="currentColor"/><path d="M30 36C18 20 8 18 6 22c-2 5 12 12 22 14M34 36c12-16 22-18 24-14 2 5-12 12-22 14" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M32 10v12M26 16l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.6"/></svg>
-    <span id="biteLbl" class="lbl"></span>
-  </button>
 </section>
 <div id="say" class="say hidden"></div>
+<div id="fxWord" class="word hidden"></div>
 
 <!-- タイトル -->
 <section id="title" class="screen hidden">
+  <img class="title-art" src="img/title.webp?v=4" alt="">
   <div class="title-block">
     <h1 data-t="title"></h1>
     <p class="sub" data-t="sub"></p>
     <div class="title-actions">
       <button id="btnStart" class="go" data-t="start"></button>
-      <button id="btnHow" class="text-btn" data-t="howBtn"></button>
+      <button id="btnHow" class="mini" data-t="howBtn"></button>
+      <span id="bestT" class="best"></span>
     </div>
+    <nav class="foot">
+      <button id="btnLang" class="mini" data-t="lang"></button>
+      <button id="btnMute" class="mini"></button>
+      <a class="mini" href="https://tom3games.github.io/" data-t="more"></a>
+    </nav>
   </div>
-  <nav class="foot">
-    <button id="btnLang" class="mini" data-t="lang"></button>
-    <button id="btnMute" class="mini"></button>
-    <a class="mini" href="https://tom3games.github.io/" data-t="more"></a>
-  </nav>
 </section>
 
-<!-- 遊び方: 蚊取り線香の箱の裏の注意書き -->
+<!-- 遊び方: 町内の回覧板 -->
 <section id="how" class="screen hidden">
   <div class="notice">
     <h2 data-t="howTitle"></h2>
     <ol id="howList"></ol>
+    <div id="howWho" class="who"></div>
     <dl class="keys" id="howKeys"></dl>
     <button id="btnOk" class="go small" data-t="ok"></button>
     <p class="credit" data-t="credit"></p>
@@ -80,32 +79,30 @@
   <div class="pause-box">
     <p data-t="paused"></p>
     <button id="btnResume" class="go small" data-t="resume"></button>
-    <button id="btnQuit" class="text-btn" data-t="quit"></button>
+    <button id="btnQuit" class="mini" data-t="quit"></button>
   </div>
 </section>
 
-<!-- 結果: かゆみ報告書 -->
+<!-- 結果: 指名手配書 -->
 <section id="result" class="screen hidden">
   <canvas id="report"></canvas>
   <div class="result-actions">
     <button id="btnAgain" class="go small" data-t="again"></button>
-    <div class="row">
-      <a id="btnPost" class="mini" target="_blank" rel="noopener" data-t="post"></a>
-      <button id="btnSave" class="mini" data-t="save"></button>
-      <button id="btnTitle" class="mini" data-t="toTitle"></button>
-    </div>
+    <a id="btnPost" class="mini" target="_blank" rel="noopener" data-t="post"></a>
+    <button id="btnSave" class="mini" data-t="save"></button>
+    <button id="btnTitle" class="mini" data-t="toTitle"></button>
   </div>
 </section>
 
 <!-- 読み込み中: 蚊取り線香が燃えて減っていく（本物の読み込み数で進む） -->
 <div id="boot" class="boot" style="--p:0">
   <svg class="coil" viewBox="-60 -60 120 120" aria-hidden="true">
-    <path id="coilAsh" d="" fill="none" stroke="#8d8a84" stroke-width="5" stroke-linecap="round" pathLength="100"/>
+    <path id="coilAsh" d="" fill="none" stroke="#a7a091" stroke-width="5" stroke-linecap="round" pathLength="100"/>
     <path id="coilGreen" d="" fill="none" stroke="#3f6b3a" stroke-width="5" stroke-linecap="round" pathLength="100"/>
     <circle id="coilEmber" r="3.4" fill="#ff6a2a"/>
   </svg>
   <div class="wisp" aria-hidden="true"><i></i><i></i><i></i></div>
-  <p id="bootMsg" class="boot-msg">家族が寝つくまで待機中</p>
+  <p id="bootMsg" class="boot-msg">家族が目を覚ますまで待機中</p>
 </div>
 
 <script>
@@ -114,13 +111,12 @@
   var d='', pts=[]; for(var t=0;t<=1.0001;t+=0.005){var a=t*Math.PI*2*3.4, r=6+t*46; pts.push([Math.cos(a)*r,Math.sin(a)*r])}
   pts.reverse(); for(var i=0;i<pts.length;i++) d+=(i?'L':'M')+pts[i][0].toFixed(1)+' '+pts[i][1].toFixed(1)
   document.getElementById('coilAsh').setAttribute('d',d); document.getElementById('coilGreen').setAttribute('d',d)
-  window.__coilPts=pts
   var g=document.getElementById('coilGreen'), e=document.getElementById('coilEmber'), b=document.getElementById('boot')
   function upd(){ if(!b.isConnected) return; var p=parseFloat(getComputedStyle(b).getPropertyValue('--p'))||0, k=Math.min(.92,p*.92)
     g.style.strokeDasharray='100'; g.style.strokeDashoffset=String(-k*100)
     var i=Math.min(pts.length-1,Math.floor(k*(pts.length-1))); e.setAttribute('cx',pts[i][0]); e.setAttribute('cy',pts[i][1]); requestAnimationFrame(upd) }
   upd()
-  if(!/^ja/.test(navigator.language||'ja')&&!localStorage.getItem('nm_lang')) document.getElementById('bootMsg').textContent='Waiting for the family to fall asleep'
+  if(!/^ja/.test(navigator.language||'ja')&&!localStorage.getItem('nm_lang')) document.getElementById('bootMsg').textContent='Waiting for the family to wake up'
 })();
 // 拡大を止める（ピンチ・ダブルタップ・Ctrl+ホイール/キー）。iOS は user-scalable=no を無視するので JS でも止める
 (function(){
@@ -146,8 +142,8 @@
   },9000);
 })();
 </script>
-<script src="data.js?v=3"></script>
-<script src="sfx.js?v=3"></script>
-<script type="module" src="js/game.js?v=3"></script>
+<script src="data.js?v=4"></script>
+<script src="sfx.js?v=4"></script>
+<script type="module" src="js/game.js?v=4"></script>
 </body>
 </html>
