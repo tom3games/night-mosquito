@@ -1,4 +1,5 @@
 // 夏の夜の蚊の検証一式。node verify.mjs（音は出さない）
+import './mute-auto.mjs'  // テスト中は絶対に音を出さない（playwright を無音に差し替え）
 import { MUTE_LAUNCH, muteContext } from './mute.mjs'
 import { chromium, webkit } from 'playwright'
 import { spawn } from 'node:child_process'
