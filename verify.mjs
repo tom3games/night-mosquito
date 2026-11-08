@@ -76,7 +76,8 @@ await t('OGP 一式があり og.png は 1200x630', async () => {
   expect(r.t && r.d && r.i && r.c === 'summary_large_image' && r.s === 200 && r.w === 1200 && r.h === 630, r); return `${r.w}x${r.h}`
 })
 await t('古い文言が残っていない（吸う・かゆみ・刺す・寝ている・報告書）', async () => {
-  const src = ['index.html', 'data.js', 'js/game.js', 'README.md'].map(f => readFileSync(ROOT + '/' + f, 'utf8')).join('\n')
+  // 支援ボタンの品名（data-ja="かゆみ止め"）はゲームの文言ではないので外して調べる
+  const src = ['index.html', 'data.js', 'js/game.js', 'README.md'].map(f => readFileSync(ROOT + '/' + f, 'utf8')).join('\n').replace(/<script src="support\.js[^>]*><\/script>/g, '')
   const hit = ['吸う', '吸っ', '吸血', 'かゆみ', '報告書', '刺す', '刺し', '寝ている', '寝静', '寝つく', 'Yuji Syuku', 'btnBite', 'kayumi', 'blood', 'Bite'].filter(w => src.includes(w))
   expect(hit.length === 0, hit.join(',')); return true
 })
