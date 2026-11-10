@@ -1,7 +1,7 @@
 // 夏の夜の蚊。自分が蚊になって、起きた家族の攻撃を飛び回ってかわす。スコアは生きのびた秒数
 // 3D の部屋に、切り絵のように立つイラストの人物。カメラは蚊の斜め後ろ。物理と判定は固定60Hz（performance.now で数える）
 import * as THREE from 'three'
-import { buildRoom, ROOM } from './room.js?v=4'
+import { buildRoom, ROOM } from './room.js?v=5'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)

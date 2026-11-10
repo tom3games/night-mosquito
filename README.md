@@ -9,5 +9,5 @@
 ## 開発
 - `node server.mjs` で http://localhost:5643
 - `node verify.mjs` 検証一式（音は出さない）、`node sim.mjs` bot の分布、`node og.mjs` OGP 画像、`node shot.mjs <名前> <式...>` 撮影
-- 絵は art/prompts/ を codex_imagegen で生成し、`python art/key.py` で切り抜いて img/ へ（Pillow と numpy が要る。元絵 art/raw は Git に入れない）
+- 絵は `python art/key.py` で切り抜いて img/ へ（Pillow と numpy が要る。元絵 art/raw は Git に入れない）
 - 素材のライセンスは CREDITS.md

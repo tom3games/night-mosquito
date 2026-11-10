@@ -1,7 +1,7 @@
 # クレジット
 
 ## 絵
-- 人物・蚊・小道具・壁の絵: 画像生成（codex_imagegen）で作成。元のプロンプトは art/prompts/
+- 人物・蚊・小道具・壁の絵: このゲームのために作成
 
 ## 音
 - snd/crickets.mp3: Crickets Ambient Noise - loopable / Wolfgang_ / CC0

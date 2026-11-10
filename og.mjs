@@ -1,4 +1,4 @@
-// OGP 画像（1200x630）。画像生成の絵＋題字。node og.mjs（音は出さない）
+// OGP 画像（1200x630）。ゲームの絵＋題字。node og.mjs（音は出さない）
 import './mute-auto.mjs'  // テスト中は絶対に音を出さない（playwright を無音に差し替え）
 import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
