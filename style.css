@@ -36,7 +36,7 @@ button{border:0;background:none;cursor:pointer}
 /* タイトル: イラストが主役。下に題字 */
 #title{background:#d7cf8c}
 .title-art{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 0}
-.title-block{position:absolute;left:0;right:0;bottom:0;padding:0 max(18px,env(safe-area-inset-left)) max(4px,env(safe-area-inset-bottom))}
+.title-block{position:absolute;left:0;right:0;bottom:0;padding:0 max(18px,env(safe-area-inset-left)) max(4px,calc(env(safe-area-inset-bottom) + var(--inapp-bot,0px)))}
 #title h1{font-family:"Potta One",sans-serif;font-weight:400;font-size:clamp(50px,15.5vw,66px);line-height:1;color:#fffbe9;-webkit-text-stroke:2.5px var(--ink);paint-order:stroke fill;text-shadow:3px 4px 0 var(--ink);transform:rotate(-2deg);transform-origin:left bottom}
 html[lang=en] #title h1{font-size:clamp(38px,11vw,50px)}
 .sub{margin:10px 0 12px;font-size:15px;font-weight:700;line-height:1.5;color:var(--ink);white-space:pre-line;text-shadow:0 0 6px #e9e0a6,0 0 6px #e9e0a6,0 0 6px #e9e0a6}
@@ -80,15 +80,15 @@ html[lang=en] #title h1{font-size:clamp(38px,11vw,50px)}
 .near{position:absolute;left:50%;top:42%;font-family:"Potta One",sans-serif;font-size:34px;color:#ffe25a;-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;transform:translate(-50%,-50%) rotate(-7deg);animation:near .5s ease-out both}
 @keyframes near{0%{transform:translate(-50%,-30%) rotate(-7deg) scale(.6)}18%{transform:translate(-50%,-55%) rotate(-7deg) scale(1.15)}100%{transform:translate(-50%,-90%) rotate(-7deg) scale(1);opacity:.1}}
 .touch{position:absolute;inset:0;pointer-events:none}
-.stickzone{position:absolute;left:0;bottom:0;width:calc(max(16px,env(safe-area-inset-left)) + 62px + 92px);height:calc(max(18px,env(safe-area-inset-bottom)) + 62px + 92px);pointer-events:auto;touch-action:none}
-.stick{position:absolute;left:calc(max(16px,env(safe-area-inset-left)) + 62px);top:calc(100% - max(18px,env(safe-area-inset-bottom)) - 62px);width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;border:3px solid var(--ink);background:rgba(255,246,220,.28);opacity:.88}
+.stickzone{position:absolute;left:0;bottom:0;width:calc(max(16px,env(safe-area-inset-left)) + 62px + 92px);height:calc(max(18px,calc(env(safe-area-inset-bottom) + var(--inapp-bot,0px))) + 62px + 92px);pointer-events:auto;touch-action:none}
+.stick{position:absolute;left:calc(max(16px,env(safe-area-inset-left)) + 62px);top:calc(100% - max(18px,calc(env(safe-area-inset-bottom) + var(--inapp-bot,0px))) - 62px);width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;border:3px solid var(--ink);background:rgba(255,246,220,.28);opacity:.88}
 .stick.held{opacity:1}
 .stick .knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:#fff6dc;border:3px solid var(--ink)}
 /* 羽で上下。手前の親指に寄せて2段 */
 .wing{position:absolute;right:max(16px,env(safe-area-inset-right));width:72px;height:72px;border-radius:50%;background:rgba(255,246,220,.72);border:3px solid var(--ink);display:grid;place-items:center;pointer-events:auto;touch-action:none}
 .wing svg{width:50px;height:46px}
-.wing.up{bottom:calc(max(18px,env(safe-area-inset-bottom)) + 84px)}
-.wing.down{bottom:max(18px,env(safe-area-inset-bottom))}
+.wing.up{bottom:calc(max(18px,calc(env(safe-area-inset-bottom) + var(--inapp-bot,0px))) + 84px)}
+.wing.down{bottom:max(18px,calc(env(safe-area-inset-bottom) + var(--inapp-bot,0px)))}
 .wing.on{background:#ffe25a;transform:scale(.94)}
 /* 画面の外にいる人の顔 */
 .edge{position:absolute;left:0;top:0;width:48px;height:48px;border-radius:50%;background:#fff6dc;border:3px solid var(--ink);overflow:hidden}
@@ -103,12 +103,12 @@ html[lang=en] #title h1{font-size:clamp(38px,11vw,50px)}
 @keyframes word{0%{transform:translate(-50%,-50%) rotate(-8deg) scale(2.4);opacity:0}100%{transform:translate(-50%,-50%) rotate(-8deg) scale(1)}}
 
 /* ---------- 結果: 手配書を壁に貼る */
-#result{background:linear-gradient(90deg,#c47a2a 0 7px,#1b1612 7px 10px,transparent 10px calc(100% - 10px),#1b1612 calc(100% - 10px) calc(100% - 7px),#c47a2a calc(100% - 7px)) #fbefcf;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px 8px max(4px,env(safe-area-inset-bottom))}
-#report{width:min(calc(100vw - 16px),calc((100svh - 118px) * .7258));height:auto;aspect-ratio:900/1240;margin-top:auto;transform:rotate(-.7deg);filter:drop-shadow(0 4px 0 rgba(27,22,18,.5));animation:paper .42s cubic-bezier(.2,.8,.3,1) both}
+#result{background:linear-gradient(90deg,#c47a2a 0 7px,#1b1612 7px 10px,transparent 10px calc(100% - 10px),#1b1612 calc(100% - 10px) calc(100% - 7px),#c47a2a calc(100% - 7px)) #fbefcf;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px 8px max(4px,calc(env(safe-area-inset-bottom) + var(--inapp-bot,0px)))}
+#report{width:min(calc(100vw - 16px),calc((100svh - 118px - var(--inapp-bot,0px)) * .7258));height:auto;aspect-ratio:900/1240;margin-top:auto;transform:rotate(-.7deg);filter:drop-shadow(0 4px 0 rgba(27,22,18,.5));animation:paper .42s cubic-bezier(.2,.8,.3,1) both}
 #report.slam{animation:slam .3s ease-out}
 @keyframes paper{from{transform:translateY(-110%) rotate(-5deg)}}
 @keyframes slam{0%{transform:rotate(-.7deg) scale(1)}30%{transform:rotate(.6deg) scale(.975)}100%{transform:rotate(-.7deg) scale(1)}}
-.result-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:0 2px;margin:auto -8px 0;align-self:stretch;background:#d7cf8c;border-top:3px solid var(--ink);padding:8px 8px 4px;margin-bottom:calc(-1 * max(4px,env(safe-area-inset-bottom)))}
+.result-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:0 2px;margin:auto -8px 0;align-self:stretch;background:#d7cf8c;border-top:3px solid var(--ink);padding:8px 8px calc(4px + var(--inapp-bot,0px));margin-bottom:calc(-1 * max(4px,calc(env(safe-area-inset-bottom) + var(--inapp-bot,0px))))}
 .result-actions .go{margin-right:6px}
 @media (max-height:700px){
   .notice{padding:10px 14px 6px;gap:4px}
@@ -120,3 +120,5 @@ html[lang=en] #title h1{font-size:clamp(38px,11vw,50px)}
   .go.small{font-size:19px;padding:6px 22px 8px}
   #report{width:min(calc(100vw - 16px),calc((100svh - 122px) * .7258))}
 }
+/* X のアプリの中で背の低い画面: 下の操作が2段になる分、報告書を小さくする */
+@media (max-height:680px){html.inapp-x #report{width:min(calc(100vw - 16px),calc((100svh - 170px - var(--inapp-bot,0px)) * .7258))}}
